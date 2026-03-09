@@ -1,0 +1,120 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "oobo",
+  "projectDescription": "Git decorator that enriches commits with AI context, sessions, tokens, and code attribution",
+  "theme": "aspen",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/anchors",
+              "concepts/sessions",
+              "concepts/transparency",
+              "concepts/attribution"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "commands/overview",
+              "commands/sessions",
+              "commands/anchors",
+              "commands/stats",
+              "commands/projects",
+              "commands/setup",
+              "commands/scan",
+              "commands/share",
+              "commands/agent"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/supported-tools",
+              "guides/alias-setup",
+              "guides/privacy-security",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "For AI Agents",
+        "groups": [
+          {
+            "group": "Agent Integration",
+            "pages": [
+              "agents/overview",
+              "agents/json-output",
+              "agents/installation",
+              "agents/lifecycle-hooks",
+              "agents/skill-file"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Data Structures",
+            "pages": [
+              "api/anchor",
+              "api/session",
+              "api/file-change",
+              "api/contributor"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Transparent git decorator with zero workflow changes",
+    "AI session discovery across 10+ coding tools",
+    "Automatic anchor creation linking commits to AI context",
+    "Code attribution tracking (AI vs human lines)",
+    "Local SQLite + orphan branch storage",
+    "Interactive TUI for sessions and analytics",
+    "JSON output mode for AI agents (--agent flag)",
+    "Secret redaction for safe sharing",
+    "Token counting and cost tracking",
+    "Agent lifecycle hooks for real-time session linking"
+  ],
+  "publicApiSurface": [
+    "oobo setup",
+    "oobo commit",
+    "oobo push",
+    "oobo sessions [list|show|search|export]",
+    "oobo anchors",
+    "oobo stats",
+    "oobo projects",
+    "oobo card",
+    "oobo scan",
+    "oobo index",
+    "oobo sources",
+    "oobo share",
+    "oobo agent",
+    "oobo inspect",
+    "oobo alias [install|uninstall]",
+    "oobo auth",
+    "oobo update",
+    "--agent (global flag for JSON output)"
+  ]
+}
