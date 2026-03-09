@@ -1,0 +1,252 @@
+---
+title: Sessions
+description: How oobo discovers and links AI chat sessions to commits
+---
+
+A **session** represents a single AI chat conversation discovered from any supported tool. Oobo reads session metadata from local tool storage and links sessions to commits based on timing and lifecycle hooks.
+
+## What is a Session?
+
+Each session contains:
+
+<ResponseField name="session_id" type="string" required>
+  Unique identifier (usually a UUID)
+</ResponseField>
+<ResponseField name="name" type="string" required>
+  Session title or first message preview
+</ResponseField>
+<ResponseField name="mode" type="string" required>
+  Chat mode: `chat`, `agent`, `composer`, `edit`, etc.
+</ResponseField>
+<ResponseField name="source" type="string" required>
+  Tool identifier: `cursor`, `claude`, `gemini`, `opencode`, etc.
+</ResponseField>
+<ResponseField name="created_at" type="integer">
+  Unix timestamp (milliseconds) when session started
+</ResponseField>
+<ResponseField name="updated_at" type="integer">
+  Unix timestamp (milliseconds) of last activity
+</ResponseField>
+<ResponseField name="project_path" type="string" required>
+  Absolute path to the project directory
+</ResponseField>
+
+<Info>
+Oobo is **read-only** — it never writes to AI tool directories. All session data is discovered from existing local storage.
+</Info>
+
+## How Sessions are Discovered
+
+Oobo implements the `Tool` trait for each supported AI tool:
+
+```rust
+pub trait Tool {
+    fn name(&self) -> &'static str;
+    fn sessions_for_project(&self, project_path: &str) -> Result<Vec<Session>, String>;
+    fn all_sessions(&self) -> Result<Vec<Session>, String>;
+    fn find_transcript(&self, project_path: &str, session_id: &str) -> Option<PathBuf>;
+    fn parse_messages(&self, path: &Path) -> Vec<Message>;
+    // ...
+}
+```
+
+Each tool integration knows:
+- Where sessions are stored (SQLite, JSON files, etc.)
+- How to parse conversation history
+- How to extract token usage and model info
+
+### Supported Tools
+
+| Tool | Sessions | Transcripts | Token Stats | Agent Hooks |
+|------|:--------:|:-----------:|:-----------:|:-----------:|
+| Cursor | ✓ | ✓ | ✓ | ✓ |
+| Claude Code | ✓ | ✓ | ✓ | ✓ |
+| Gemini CLI | ✓ | ✓ | ✓ | ✓ |
+| OpenCode | ✓ | ✓ | ✓ | ✓ |
+| Codex CLI | ✓ | ✓ | ✓ | — |
+| Aider | ✓ | ✓ | ✓ | — |
+| GitHub Copilot Chat | ✓ | ✓ | ✓ | — |
+| Windsurf | ✓ | ✓ | partial | — |
+| Zed | ✓ | ✓ | ✓ | — |
+| Trae | ✓ | ✓ | partial | — |
+
+<Note>
+**Agent Hooks** enable real-time session tracking. Tools without hooks rely on time-window correlation.
+</Note>
+
+## Linking Sessions to Commits
+
+Oobo uses two strategies to link sessions to commits:
+
+### 1. Explicit Linking (Preferred)
+
+For tools that support lifecycle hooks (Cursor, Claude Code, Gemini CLI, OpenCode), oobo installs hooks that track when agent sessions start and end.
+
+When a commit happens:
+1. Check if any session is **actively running**
+2. If yes, link that session to the commit with `link_type: explicit`
+3. Capture which files the agent touched during the session
+
+```json
+{
+  "session_id": "2c97dced-3950-482e-b101-9eb7d1b18cf5",
+  "agent": "cursor",
+  "model": "claude-sonnet-4-20250514",
+  "link_type": "explicit",
+  "files_touched": ["src/widget.rs", "src/main.rs"]
+}
+```
+
+<Info>
+Explicit links are **certain** — oobo knows for sure the session contributed to the commit.
+</Info>
+
+### 2. Inferred Linking (Fallback)
+
+For tools without hooks, oobo uses time-window correlation:
+
+1. Find all sessions active during commit time ± buffer (5 minutes)
+2. Match session's `project_path` to commit's repo
+3. Link session with `link_type: inferred`
+
+```json
+{
+  "session_id": "abc123",
+  "agent": "aider",
+  "model": "gpt-4o",
+  "link_type": "inferred"
+}
+```
+
+<Warning>
+Inferred links are **best guesses** — there's a chance the session wasn't actually involved in the commit.
+</Warning>
+
+## Session Metadata Captured
+
+When a session is linked to a commit, oobo captures:
+
+<AccordionGroup>
+  <Accordion title="Token Usage">
+    <ResponseField name="input_tokens" type="integer">
+      Total input tokens consumed
+    </ResponseField>
+    <ResponseField name="output_tokens" type="integer">
+      Total output tokens generated
+    </ResponseField>
+    <ResponseField name="cache_read_tokens" type="integer">
+      Tokens read from prompt cache
+    </ResponseField>
+    <ResponseField name="cache_creation_tokens" type="integer">
+      Tokens written to prompt cache
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Activity Metrics">
+    <ResponseField name="duration_secs" type="integer">
+      Session duration in seconds
+    </ResponseField>
+    <ResponseField name="tool_calls" type="integer">
+      Number of tool invocations (file edits, shell commands, etc.)
+    </ResponseField>
+    <ResponseField name="files_touched" type="array">
+      File paths modified by the agent
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Agent Info">
+    <ResponseField name="agent" type="string" required>
+      Tool name (e.g., `cursor`, `claude`, `gemini`)
+    </ResponseField>
+    <ResponseField name="model" type="string">
+      AI model identifier (e.g., `claude-sonnet-4-20250514`, `gpt-4o`)
+    </ResponseField>
+    <ResponseField name="is_subagent" type="boolean">
+      Whether this session was spawned by another agent
+    </ResponseField>
+  </Accordion>
+</AccordionGroup>
+
+## Browsing Sessions
+
+### Interactive TUI
+
+```bash
+oobo sessions                    # sessions for current project
+oobo sessions --all              # sessions across all projects
+```
+
+The TUI shows:
+- Session source and mode
+- AI model used
+- Token usage (input/output/cache)
+- Duration and tool calls
+- First message preview
+
+Navigate with arrows, press Enter to view the full conversation.
+
+### Searching
+
+```bash
+oobo sessions search "auth bug"  # keyword search
+oobo sessions search "fix:"      # search by prefix
+```
+
+Search scans:
+- Session names
+- First message content
+- File paths in transcript
+
+### Agent Mode (JSON)
+
+For automation and scripting:
+
+```bash
+oobo sessions --agent            # list all sessions as JSON
+oobo sessions list --agent       # explicit subcommand
+oobo sessions show abc12def --agent  # view session by ID prefix
+oobo sessions search "bug" --agent   # search results as JSON
+```
+
+## Session Export
+
+Export conversations to various formats:
+
+```bash
+oobo sessions export abc12def --format md --out chat.md
+oobo sessions export abc12def --format json --out chat.json
+oobo sessions export abc12def --format txt --out chat.txt
+```
+
+Exported transcripts are **redacted** using [gitleaks](https://github.com/gitleaks/gitleaks) patterns to strip secrets before writing.
+
+<Warning>
+Always review exported transcripts before sharing — redaction is best-effort and may miss custom secret formats.
+</Warning>
+
+## Session Sharing
+
+Share a session with collaborators:
+
+```bash
+oobo share abc12def              # upload and get shareable link
+oobo share abc12def --agent      # JSON output with share URL
+```
+
+Shared sessions:
+- Are **redacted** before upload
+- Expire after configurable TTL
+- Require endpoint configuration (`~/.oobo/config.toml`)
+
+## Privacy
+
+- **Read-only**: Oobo never writes to AI tool directories
+- **Local by default**: Sessions stay in `~/.oobo/oobo.db` unless you share or configure an endpoint
+- **Secret redaction**: All exports and uploads are scrubbed with gitleaks patterns
+- **No telemetry**: Oobo does not phone home
+
+## Related Concepts
+
+- [Anchors](/concepts/anchors) — How sessions are attached to commits
+- [Attribution](/concepts/attribution) — How session data drives code attribution
+- [Transparency](/concepts/transparency) — When transcripts go on the orphan branch

@@ -1,0 +1,254 @@
+---
+title: Transparency
+description: Control what metadata syncs via git
+---
+
+Transparency mode controls whether **redacted session transcripts** are written to the git orphan branch alongside anchor metadata.
+
+## Transparency Modes
+
+Oobo supports two modes:
+
+```rust
+pub enum TransparencyMode {
+    /// Metadata only — no transcripts on the orphan branch.
+    Off,
+    /// Metadata + redacted transcripts on the orphan branch.
+    On,
+}
+```
+
+### Off (Default)
+
+**What syncs:**
+- Anchor metadata (commit hash, branch, author, stats)
+- Session links (session ID, agent, model, token counts)
+- File attribution data
+
+**What stays local:**
+- Full session transcripts (conversations)
+- Tool-specific metadata
+
+This is the **default** and recommended mode for most users.
+
+<Info>
+With transparency `off`, anchor metadata still syncs via git — you get commit-session links, token usage, and attribution across machines. Only the conversation content stays local.
+</Info>
+
+### On
+
+**What syncs:**
+- Everything from `off` mode
+- **Redacted session transcripts** for each linked session
+
+**Privacy safeguards:**
+- Transcripts are scrubbed with [gitleaks](https://github.com/gitleaks/gitleaks) patterns before writing
+- Secrets like API keys, tokens, passwords are stripped
+- Redaction happens **before** any data touches the orphan branch
+
+<Warning>
+Transparency `on` makes session conversations part of your git history. Once pushed, transcripts can be cloned by anyone with repo access. Use this mode only in trusted environments.
+</Warning>
+
+## What Goes on the Orphan Branch
+
+The `oobo/anchors/v1` orphan branch stores anchor data in a sharded directory structure:
+
+```
+oobo/anchors/v1
+├── c8/
+│   └── e12fa9b3d4.../
+│       ├── metadata.json       # Anchor metadata (always written)
+│       ├── 1/
+│       │   ├── metadata.json   # Session link metadata (always written)
+│       │   └── transcript.txt  # Redacted transcript (only if transparency=on)
+│       └── 2/
+│           ├── metadata.json
+│           └── transcript.txt  # (only if transparency=on)
+```
+
+### Always Written (Both Modes)
+
+**Anchor `metadata.json`:**
+```json
+{
+  "oobo_version": "0.1.0",
+  "commit_hash": "c8e12fa9...",
+  "branch": "main",
+  "author": "Alice <alice@example.com>",
+  "author_type": "assisted",
+  "contributors": [...],
+  "committed_at": 1700000000,
+  "message": "feat: add widget",
+  "files_changed": ["src/widget.rs"],
+  "lines_added": 42,
+  "lines_deleted": 5,
+  "ai_lines_added": 40,
+  "human_lines_added": 2,
+  "ai_percentage": 85.1,
+  "session_ids": ["2c97dced-3950-482e-b101-9eb7d1b18cf5"],
+  "transparency_mode": "off"
+}
+```
+
+**Session link `1/metadata.json`:**
+```json
+{
+  "session_id": "2c97dced-3950-482e-b101-9eb7d1b18cf5",
+  "agent": "cursor",
+  "model": "claude-sonnet-4-20250514",
+  "link_type": "explicit",
+  "input_tokens": 15000,
+  "output_tokens": 8000,
+  "duration_secs": 120,
+  "tool_calls": 5,
+  "files_touched": ["src/widget.rs"],
+  "is_subagent": false
+}
+```
+
+### Only When Transparency = On
+
+**Session transcript `1/transcript.txt`:**
+```
+User:
+Add a widget module with basic CRUD operations.
+
+Assistant (cursor):
+I'll create a new widget module with create, read, update, and delete functions.
+
+[file: src/widget.rs]
+...
+
+User:
+Add validation for widget names.
+
+Assistant (cursor):
+Adding input validation to the create function...
+```
+
+Transcripts are:
+- **Redacted** using gitleaks patterns
+- **Formatted** as plain text for readability
+- **Truncated** if they exceed reasonable size limits
+
+## Toggling Transparency
+
+Edit `~/.oobo/config.toml`:
+
+```toml
+[transparency]
+mode = "on"  # or "off"
+```
+
+Or use the setup wizard:
+
+```bash
+oobo setup
+```
+
+<Note>
+Changing transparency mode affects **new commits only**. Existing anchors on the orphan branch are not modified.
+</Note>
+
+## Privacy Implications
+
+### Transparency Off
+
+**Local storage:**
+- Sessions: `~/.oobo/oobo.db` (SQLite)
+- Transcripts: Tool-specific storage (Cursor, Claude, etc.)
+
+**Git storage:**
+- Anchors: Metadata only on `oobo/anchors/v1` branch
+- Session links: Agent, model, tokens, files touched
+
+**Who can see what:**
+- **You**: Full session history via `oobo sessions`
+- **Collaborators**: Commit-session links, token stats, attribution percentages
+- **Repo clones**: Same as collaborators (metadata only)
+
+### Transparency On
+
+**Local storage:**
+- Same as `off`
+
+**Git storage:**
+- Anchors: Metadata + **redacted transcripts** on `oobo/anchors/v1`
+
+**Who can see what:**
+- **You**: Full session history (local DB + git)
+- **Collaborators**: Metadata + conversation content (redacted)
+- **Repo clones**: Same as collaborators (transcripts are part of git history)
+
+<Warning>
+**Important:** With transparency `on`, anyone who clones the repo can read session transcripts. Even though they're redacted, they may contain:
+- Problem descriptions and debugging steps
+- Code architecture discussions
+- File names and function signatures
+- AI model reasoning and suggestions
+
+Only enable transparency if you trust everyone with repo access.
+</Warning>
+
+## Use Cases
+
+### When to Use Off (Default)
+
+- **Open source projects**: Keep conversations private, share only metadata
+- **Company repos**: Avoid leaking internal discussions
+- **Solo projects**: No need to sync transcripts across machines
+- **Default safe choice**: Maximizes privacy while preserving attribution
+
+### When to Use On
+
+- **Team learning**: Share AI collaboration context with teammates
+- **Onboarding**: Let new devs see how problems were solved
+- **Research**: Document AI-assisted development process
+- **Trusted environments**: Private repos where all members should see conversations
+
+## Secret Redaction
+
+When transparency is `on`, oobo uses [gitleaks](https://github.com/gitleaks/gitleaks) patterns to strip secrets before writing transcripts:
+
+**Redacted patterns:**
+- API keys (AWS, GCP, Azure, OpenAI, Anthropic, etc.)
+- Passwords and authentication tokens
+- Private keys (SSH, PGP, TLS)
+- Database connection strings
+- OAuth tokens and JWTs
+
+**Example:**
+
+```diff
+- export OPENAI_API_KEY=sk-proj-abc123def456...
++ export OPENAI_API_KEY=[REDACTED]
+```
+
+<Warning>
+Redaction is **best-effort**. Always review transcripts manually before enabling transparency on sensitive repos. Custom secret formats may not be caught.
+</Warning>
+
+## Config Protection
+
+Regardless of transparency mode, oobo protects local config:
+
+```bash
+chmod 0600 ~/.oobo/config.toml  # applied automatically
+```
+
+API keys in `config.toml` never leave your machine unless you explicitly use them with `oobo share` or configure an endpoint.
+
+## Checking Current Mode
+
+```bash
+oobo dash                        # shows current transparency setting
+oobo anchors                     # each anchor displays its transparency mode
+oobo anchors --agent             # machine-readable JSON
+```
+
+## Related Concepts
+
+- [Anchors](/concepts/anchors) — What metadata is always captured
+- [Sessions](/concepts/sessions) — What transcripts contain
+- [Attribution](/concepts/attribution) — Privacy-safe code statistics

@@ -1,0 +1,350 @@
+---
+title: agent
+description: Print the AI agent skill file
+---
+
+## Overview
+
+The `agent` command prints the skill file that tells AI agents how to use oobo. The skill file is also installed at `~/.agents/skills/oobo/SKILL.md` during `oobo setup`.
+
+```bash
+oobo agent
+```
+
+## What is a Skill File?
+
+A **skill file** is a structured markdown document that AI coding tools read to learn about available commands. Oobo's skill file includes:
+
+- **Installation command** - How to install oobo
+- **Version check** - How to verify oobo is installed
+- **Command reference** - Every command with JSON schemas
+- **Usage examples** - Real-world workflows
+- **Agent workflows** - Best practices for AI agents
+
+## Skill File Location
+
+During `oobo setup`, the skill file is installed at:
+
+```
+~/.oobo/skills/oobo/SKILL.md
+~/.agents/skills/oobo/         ← symlink
+```
+
+AI tools that scan `~/.agents/skills/` will automatically discover it.
+
+### Supported Tools
+
+| Tool | Scans `~/.agents/skills/` | Auto-Discovery |
+|------|---------------------------|----------------|
+| Cursor | ✓ | ✓ |
+| Claude Code | ✓ | ✓ |
+| Codex CLI | ✓ | ✓ |
+| Gemini CLI | ✓ | ✓ |
+| OpenCode | ✓ | ✓ |
+| Windsurf | — | — |
+| Aider | — | — |
+| GitHub Copilot | — | — |
+
+<Note>
+  Tools with **Auto-Discovery** automatically load the skill file and make oobo commands available to agents.
+</Note>
+
+## Command Usage
+
+### Print skill file
+
+```bash
+oobo agent
+```
+
+Output:
+```markdown
+---
+name: oobo
+description: Git decorator for AI agents - capture AI context on every commit
+install: curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+version_check: command -v oobo
+---
+
+# oobo - Git for Agents
+
+...
+```
+
+### Save to file
+
+```bash
+oobo agent > skill.md
+```
+
+### Check if installed
+
+```bash
+ls ~/.agents/skills/oobo/SKILL.md
+```
+
+If the file exists, agents can discover it.
+
+## Skill File Contents
+
+### Frontmatter
+
+YAML metadata at the top:
+
+```yaml
+---
+name: oobo
+description: Git decorator for AI agents - capture AI context on every commit
+install: curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+version_check: command -v oobo
+---
+```
+
+Agents use this to:
+- **Detect oobo** - Run `command -v oobo`
+- **Install oobo** - Run the install command
+- **Learn purpose** - Read the description
+
+### Command Reference
+
+Every oobo command with:
+
+- **Syntax** - Full command signature
+- **Flags** - All available options
+- **JSON schema** - Output format for `--agent`
+- **Examples** - Real usage patterns
+
+### Agent Workflows
+
+Recommended patterns:
+
+```markdown
+## Agent Workflows
+
+### When committing code
+
+1. Use `oobo commit` instead of `git commit`
+2. Oobo captures your session automatically
+3. Anchors sync via git push
+
+### Checking session usage
+
+1. Run `oobo sessions --agent`
+2. Parse JSON to find session IDs
+3. Use `oobo sessions show <id> --agent` for full transcript
+```
+
+### JSON Schemas
+
+For every command with `--agent`, the skill file includes the output schema:
+
+```json
+{
+  "command": "oobo sessions --agent",
+  "output": [
+    {
+      "session_id": "string (uuid)",
+      "name": "string",
+      "source": "string",
+      "model": "string",
+      "input_tokens": "number",
+      "output_tokens": "number"
+    }
+  ]
+}
+```
+
+## Use Cases
+
+### View skill file
+
+```bash
+oobo agent
+```
+
+### Install skill file manually
+
+If `oobo setup` didn't install it:
+
+```bash
+mkdir -p ~/.agents/skills/oobo
+oobo agent > ~/.agents/skills/oobo/SKILL.md
+```
+
+### Verify agent can read it
+
+From an AI agent session:
+
+```
+Agent: Check if oobo skill file exists
+→ ls ~/.agents/skills/oobo/SKILL.md
+→ File exists
+
+Agent: Read skill file
+→ cat ~/.agents/skills/oobo/SKILL.md
+→ [skill file contents]
+```
+
+### Share with other developers
+
+```bash
+oobo agent > oobo-skill.md
+# Share oobo-skill.md with team
+```
+
+### Embed in documentation
+
+```bash
+oobo agent >> CONTRIBUTING.md
+```
+
+## Agent Installation Flow
+
+When an AI agent encounters oobo for the first time:
+
+1. **Detect** - Run `command -v oobo`
+2. **Install** (if missing) - Run `curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent`
+3. **Verify** - Check install output for JSON success
+4. **Use** - Run oobo commands with `--agent` flag
+
+### Install Command
+
+From the skill file:
+
+```bash
+curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+```
+
+With `--agent`, the installer:
+- Suppresses interactive prompts
+- Returns JSON on success/failure
+- Exits with code 0 on success
+
+JSON response:
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "binary": "/usr/local/bin/oobo",
+  "platform": "darwin-arm64"
+}
+```
+
+## Updating the Skill File
+
+The skill file is embedded in the oobo binary. When you update oobo, the skill file updates too.
+
+To refresh the installed copy:
+
+```bash
+oobo setup      # Re-runs setup, updates skill file
+```
+
+Or manually:
+
+```bash
+oobo agent > ~/.oobo/skills/oobo/SKILL.md
+```
+
+## Skill File vs README
+
+| Document | Audience | Purpose |
+|----------|----------|----------|
+| `SKILL.md` | AI agents | Machine-readable commands and schemas |
+| `README.md` | Humans | Overview, installation, examples |
+
+The skill file is optimized for agents:
+- Structured frontmatter
+- JSON schemas for every command
+- Minimal prose, maximum examples
+
+## How Agents Use It
+
+### Step 1: Discovery
+
+Agent scans `~/.agents/skills/` and finds `oobo/SKILL.md`.
+
+### Step 2: Parse Frontmatter
+
+Agent reads:
+```yaml
+name: oobo
+install: curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+version_check: command -v oobo
+```
+
+### Step 3: Version Check
+
+Agent runs:
+```bash
+command -v oobo
+```
+
+If oobo is not installed, agent runs the install command.
+
+### Step 4: Read Commands
+
+Agent parses the skill file to learn:
+- Available commands
+- Required/optional flags
+- JSON output schemas
+
+### Step 5: Execute
+
+Agent uses oobo:
+```bash
+oobo sessions --agent
+oobo stats --agent
+oobo commit -m "fix auth"
+```
+
+## Troubleshooting
+
+### Skill file not found
+
+```bash
+# Re-install
+oobo setup
+
+# Verify
+ls ~/.agents/skills/oobo/SKILL.md
+```
+
+### Symlink broken
+
+```bash
+# Remove old symlink
+rm ~/.agents/skills/oobo
+
+# Re-run setup
+oobo setup
+```
+
+### Agent can't read skill
+
+Check permissions:
+
+```bash
+ls -la ~/.agents/skills/oobo/
+# Should be readable by current user
+```
+
+### Skill file outdated
+
+Update oobo:
+
+```bash
+oobo update
+oobo setup      # Reinstall skill file
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Setup" icon="gear" href="/commands/setup">
+    Learn how setup installs the skill file
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Explore all available commands
+  </Card>
+</CardGroup>

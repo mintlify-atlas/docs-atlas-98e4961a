@@ -1,0 +1,203 @@
+---
+title: "Anchor"
+description: "The enriched commit primitive - one per commit, stored on the orphan branch and in local SQLite"
+---
+
+## Overview
+
+The `Anchor` struct is the core data structure that enriches git commits with AI context. Every commit gets exactly one anchor, which captures authorship attribution, AI session metadata, and detailed file-level statistics.
+
+## Anchor Fields
+
+<ResponseField name="oobo_version" type="string" required>
+  The version of oobo that created this anchor.
+</ResponseField>
+
+<ResponseField name="commit_hash" type="string" required>
+  The git commit SHA hash.
+</ResponseField>
+
+<ResponseField name="branch" type="string" required>
+  The git branch where the commit was made.
+</ResponseField>
+
+<ResponseField name="author" type="string" required>
+  Git author - always the human who owns the repository.
+</ResponseField>
+
+<ResponseField name="author_type" type="AuthorType" required>
+  Who authored the commit and how AI was involved.
+  
+  See [AuthorType enum](#authortype-enum) for possible values.
+</ResponseField>
+
+<ResponseField name="contributors" type="Contributor[]">
+  All contributors to this commit - human(s) and AI tool(s).
+  
+  See [Contributor struct](/api/contributor) for details.
+</ResponseField>
+
+<ResponseField name="committed_at" type="integer" required>
+  Unix timestamp (seconds) when the commit was created.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  The git commit message.
+</ResponseField>
+
+<ResponseField name="files_changed" type="string[]" required>
+  List of file paths modified in this commit.
+</ResponseField>
+
+<ResponseField name="lines_added" type="integer" required>
+  Total lines added across all files.
+</ResponseField>
+
+<ResponseField name="lines_deleted" type="integer" required>
+  Total lines deleted across all files.
+</ResponseField>
+
+<ResponseField name="file_changes" type="FileChange[]">
+  Per-file breakdown with line counts and AI/human attribution.
+  
+  See [FileChange struct](/api/file-change) for details.
+</ResponseField>
+
+<ResponseField name="ai_lines_added" type="integer" default={0}>
+  Aggregate: lines added by AI across all files.
+</ResponseField>
+
+<ResponseField name="ai_lines_deleted" type="integer" default={0}>
+  Aggregate: lines deleted by AI across all files.
+</ResponseField>
+
+<ResponseField name="human_lines_added" type="integer" default={0}>
+  Aggregate: lines added by human across all files.
+</ResponseField>
+
+<ResponseField name="human_lines_deleted" type="integer" default={0}>
+  Aggregate: lines deleted by human across all files.
+</ResponseField>
+
+<ResponseField name="ai_percentage" type="float">
+  AI contribution percentage (0.0-100.0).
+</ResponseField>
+
+<ResponseField name="session_ids" type="string[]" required>
+  List of AI session IDs linked to this commit.
+</ResponseField>
+
+<ResponseField name="summary" type="string">
+  AI-generated summary of the commit.
+</ResponseField>
+
+<ResponseField name="intent" type="string">
+  AI-detected intent behind the changes.
+</ResponseField>
+
+<ResponseField name="reasoning" type="string">
+  AI-generated reasoning about the changes.
+</ResponseField>
+
+<ResponseField name="transparency_mode" type="TransparencyMode" required>
+  Whether redacted session transcripts are included alongside anchor metadata on the orphan branch.
+  
+  See [TransparencyMode enum](#transparencymode-enum) for possible values.
+</ResponseField>
+
+## AuthorType Enum
+
+Determines who authored the commit and how AI was involved.
+
+| Value | Description |
+|-------|-------------|
+| `agent` | AI autonomously committed (non-interactive terminal + active session) |
+| `assisted` | Human committed while collaborating with AI (interactive + active session) |
+| `human` | Human committed with no AI involvement (default) |
+| `automated` | CI/CD or script (non-interactive, no AI session) |
+
+## TransparencyMode Enum
+
+Controls whether redacted session transcripts are included on the orphan branch. Anchor metadata is **always** written to the branch (unless the project is ignored); this flag only controls transcripts.
+
+| Value | Description |
+|-------|-------------|
+| `off` | Metadata only - no transcripts on the orphan branch (default) |
+| `on` | Metadata + redacted transcripts on the orphan branch |
+
+## Example JSON
+
+<CodeGroup>
+```json Full Anchor
+{
+  "oobo_version": "0.1.0",
+  "commit_hash": "abc123",
+  "branch": "main",
+  "author": "Test <test@test.com>",
+  "author_type": "assisted",
+  "contributors": [
+    {
+      "name": "Test <test@test.com>",
+      "role": "human",
+      "model": null
+    },
+    {
+      "name": "cursor",
+      "role": "agent",
+      "model": "claude-sonnet-4-20250514"
+    }
+  ],
+  "committed_at": 1700000000,
+  "message": "test commit",
+  "files_changed": ["src/main.rs"],
+  "lines_added": 10,
+  "lines_deleted": 3,
+  "file_changes": [
+    {
+      "path": "src/main.rs",
+      "lines_added": 10,
+      "lines_deleted": 3,
+      "attribution": "ai",
+      "agent": "cursor"
+    }
+  ],
+  "ai_lines_added": 10,
+  "ai_lines_deleted": 3,
+  "human_lines_added": 0,
+  "human_lines_deleted": 0,
+  "ai_percentage": 100.0,
+  "session_ids": ["sess-1"],
+  "summary": "Test summary",
+  "intent": null,
+  "reasoning": null,
+  "transparency_mode": "off"
+}
+```
+
+```json Minimal Anchor
+{
+  "oobo_version": "0.1.0",
+  "commit_hash": "abc",
+  "branch": "main",
+  "author": "test",
+  "author_type": "human",
+  "committed_at": 0,
+  "message": "msg",
+  "files_changed": [],
+  "lines_added": 0,
+  "lines_deleted": 0,
+  "session_ids": [],
+  "transparency_mode": "off"
+}
+```
+</CodeGroup>
+
+<Note>
+  Optional fields like `contributors`, `file_changes`, `summary`, `intent`, and `reasoning` are omitted from JSON when empty or null.
+</Note>
+
+## Related Types
+
+- [Contributor](/api/contributor) - Individual contributors (human or AI) to a commit
+- [FileChange](/api/file-change) - Per-file change metadata with attribution
+- [Session](/api/session) - AI session metadata linked to commits

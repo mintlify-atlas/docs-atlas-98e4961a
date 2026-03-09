@@ -1,0 +1,507 @@
+---
+title: Lifecycle Hooks
+description: Explicit session linking via agent lifecycle events
+---
+
+Lifecycle hooks enable explicit session linking during commits, rather than relying on time-window correlation. When an agent session starts, a hook fires and oobo records the active session. When a commit happens, oobo links it to the active session.
+
+## Supported Tools
+
+Only tools with lifecycle hook support can fire these events:
+
+| Tool | Hooks Supported | Hook Format |
+|------|:---------------:|-------------|
+| **Cursor** | ✓ | `~/.cursor/hooks.json` |
+| **Claude Code** | ✓ | `~/.claude/settings.json` |
+| **Gemini CLI** | ✓ | `~/.gemini/settings.json` |
+| **OpenCode** | ✓ | `~/.config/opencode/plugins/oobo.ts` |
+| Codex CLI | — | Time-window inference only |
+| Aider | — | Time-window inference only |
+| GitHub Copilot Chat | — | Time-window inference only |
+| Windsurf | — | Time-window inference only |
+| Zed | — | Time-window inference only |
+| Trae | — | Time-window inference only |
+
+<Note>
+  Tools without hook support fall back to **time-window inference**: oobo links sessions to commits based on temporal proximity (sessions active within a time window before the commit).
+</Note>
+
+## What Hooks Do
+
+Lifecycle hooks track agent session state:
+
+<Steps>
+  <Step title="Session Start">
+    When an agent session begins, the tool fires a `session-start` event:
+    
+    ```bash
+    echo '{"session_id":"...","agent":"cursor","model":"claude-opus-4"}' | oobo hooks agent session-start
+    ```
+    
+    Oobo writes a state file to `.git/oobo-sessions/<session_id>.json`:
+    
+    ```json
+    {
+      "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+      "agent": "cursor",
+      "model": "claude-opus-4",
+      "worktree": "/Users/dev/myapp",
+      "started_at": 1709892600,
+      "updated_at": 1709892600
+    }
+    ```
+  </Step>
+  
+  <Step title="Commit">
+    When a commit happens, oobo reads all active sessions from `.git/oobo-sessions/` and links them to the commit anchor.
+    
+    The anchor records `link_type: "hook"` to indicate explicit linking:
+    
+    ```json
+    {
+      "sessions": [
+        {
+          "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+          "agent": "cursor",
+          "model": "claude-opus-4",
+          "link_type": "hook"
+        }
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Session End">
+    When the session ends, the tool fires a `session-end` event:
+    
+    ```bash
+    echo '{"session_id":"2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a"}' | oobo hooks agent session-end
+    ```
+    
+    Oobo removes the state file.
+  </Step>
+</Steps>
+
+## Hook Installation
+
+Hooks are installed during `oobo setup`:
+
+```bash
+oobo setup
+```
+
+This wizard:
+
+1. Detects installed AI tools
+2. Installs lifecycle hooks for supported tools
+3. Installs git hooks (post-commit, pre-push) for each project
+
+<Note>
+  Hook installation is **non-destructive**. Oobo merges its hooks into existing config files without overwriting user settings.
+</Note>
+
+### Manual Installation
+
+If you skipped setup or want to reinstall hooks:
+
+```bash
+oobo setup  # Re-runs the wizard
+```
+
+Or install per-tool manually:
+
+#### Cursor
+
+Edit or create `~/.cursor/hooks.json`:
+
+```json
+{
+  "agent": {
+    "sessionStart": {
+      "command": "oobo hooks agent session-start"
+    },
+    "sessionEnd": {
+      "command": "oobo hooks agent session-end"
+    },
+    "stop": {
+      "command": "oobo hooks agent stop"
+    }
+  }
+}
+```
+
+#### Claude Code
+
+Edit or create `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "oobo hooks agent session-start"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "oobo hooks agent stop"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "oobo hooks agent session-end"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Gemini CLI
+
+Edit or create `~/.gemini/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "oobo hooks agent session-start"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "type": "command",
+        "command": "oobo hooks agent session-end"
+      }
+    ],
+    "AfterAgent": [
+      {
+        "type": "command",
+        "command": "oobo hooks agent stop"
+      }
+    ]
+  }
+}
+```
+
+#### OpenCode
+
+Create `~/.config/opencode/plugins/oobo.ts`:
+
+```typescript
+export default async ({ client }) => ({
+  event: async ({ event }) => {
+    const { execSync } = require("child_process");
+    const input = JSON.stringify(event);
+    try {
+      if (event.type === "session.created")
+        execSync("oobo hooks agent session-start", { input, encoding: "utf-8" });
+      if (event.type === "session.deleted")
+        execSync("oobo hooks agent session-end", { input, encoding: "utf-8" });
+    } catch (_) {}
+  }
+});
+```
+
+### Verifying Hook Installation
+
+Check which tools have hooks installed:
+
+```bash
+oobo inspect --agent
+```
+
+**Example output:**
+
+```json
+{
+  "checks": [
+    {
+      "name": "hooks_installed",
+      "passed": true,
+      "tools": ["cursor", "opencode"]
+    }
+  ]
+}
+```
+
+Or check manually:
+
+```bash
+# Cursor
+cat ~/.cursor/hooks.json | grep oobo
+
+# Claude Code
+cat ~/.claude/settings.json | grep oobo
+
+# Gemini CLI
+cat ~/.gemini/settings.json | grep oobo
+
+# OpenCode
+ls ~/.config/opencode/plugins/oobo.ts
+```
+
+## Hook Events
+
+Oobo recognizes three lifecycle events:
+
+### session-start
+
+Fired when an agent session begins. Records the active session.
+
+**Payload:**
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+  "agent": "cursor",
+  "model": "claude-opus-4",
+  "cwd": "/Users/dev/myapp"
+}
+```
+
+**Required fields:**
+
+- `session_id`: Unique session identifier
+
+**Optional fields:**
+
+- `agent`: Tool name (e.g. `cursor`, `claude`, `opencode`)
+- `model`: Model identifier (e.g. `claude-opus-4`)
+- `cwd`: Working directory (defaults to current directory)
+
+### stop
+
+Fired when an agent turn completes (but session continues). Updates the session timestamp.
+
+**Payload:**
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a"
+}
+```
+
+**Required fields:**
+
+- `session_id`: Unique session identifier
+
+### session-end
+
+Fired when an agent session terminates. Removes the active session state.
+
+**Payload:**
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a"
+}
+```
+
+**Required fields:**
+
+- `session_id`: Unique session identifier
+
+## How Hooks Are Called
+
+Hooks receive JSON payloads via stdin:
+
+```bash
+echo '<payload>' | oobo hooks agent <event>
+```
+
+**Examples:**
+
+```bash
+# Session start
+echo '{"session_id":"abc123","agent":"cursor","model":"claude-opus-4"}' \
+  | oobo hooks agent session-start
+
+# Stop (turn completed)
+echo '{"session_id":"abc123"}' \
+  | oobo hooks agent stop
+
+# Session end
+echo '{"session_id":"abc123"}' \
+  | oobo hooks agent session-end
+```
+
+Hooks are designed to be **fast and non-blocking**. They write a small JSON file and exit immediately.
+
+## Multi-Worktree Support
+
+When using git worktrees (multiple working directories for the same repo), oobo tracks which worktree each session belongs to:
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+  "agent": "cursor",
+  "worktree": "/Users/dev/myapp"
+}
+```
+
+When a commit happens in worktree `/Users/dev/myapp`, oobo only links sessions that belong to that worktree.
+
+This enables **parallel agent sessions** across worktrees without conflicts:
+
+- Agent A works in main worktree `/Users/dev/myapp`
+- Agent B works in feature worktree `/Users/dev/myapp-feature`
+- Commits in each worktree link only to their respective sessions
+
+<Note>
+  Sessions without a `worktree` field (from older oobo versions) are included in all worktrees for backward compatibility.
+</Note>
+
+## Hooks vs Time-Window Inference
+
+Oobo uses two methods to link sessions to commits:
+
+| Method | Link Type | How It Works | Tools |
+|--------|-----------|--------------|-------|
+| **Lifecycle Hooks** | `hook` | Explicit tracking via session-start/end events | Cursor, Claude Code, Gemini CLI, OpenCode |
+| **Time-Window Inference** | `window` | Sessions active within 5 minutes before commit | All tools |
+
+**Hooks are preferred** when available because they provide:
+
+- **Accuracy**: No false positives from unrelated sessions
+- **Multi-agent support**: Correct attribution when multiple agents work in parallel
+- **Worktree isolation**: Sessions link only to commits in their worktree
+
+Time-window inference is used as a fallback for tools without hook support.
+
+## Session State Files
+
+Active session state is stored in `.git/oobo-sessions/`:
+
+```
+.git/
+└── oobo-sessions/
+    ├── 2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a.json
+    └── 7f8e9d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f.json
+```
+
+Each file contains:
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+  "agent": "cursor",
+  "model": "claude-opus-4",
+  "worktree": "/Users/dev/myapp",
+  "started_at": 1709892600,
+  "updated_at": 1709892750
+}
+```
+
+**Lifecycle:**
+
+- Created on `session-start`
+- Updated on `stop` (turn completed)
+- Deleted on `session-end`
+- Auto-cleaned if stale (older than 24 hours)
+
+<Warning>
+  State files are ephemeral and repo-specific. They are NOT committed to git or synced across machines.
+</Warning>
+
+## Git Hooks
+
+Oobo also installs per-repo git hooks to handle commits and pushes:
+
+### post-commit
+
+Installed at `.git/hooks/post-commit`:
+
+```bash
+#!/bin/sh
+mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/oobo/logs"
+oobo hooks post-commit "$@" 2>>"${XDG_DATA_HOME:-$HOME/.local/share}/oobo/logs"/hooks.log || true
+```
+
+Runs after every commit to:
+
+1. Read active sessions from `.git/oobo-sessions/`
+2. Build anchor metadata (commit + sessions + tokens + attribution)
+3. Write anchor to local DB and orphan branch
+4. Clean up stale session files
+
+### pre-push
+
+Installed at `.git/hooks/pre-push`:
+
+```bash
+#!/bin/sh
+mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/oobo/logs"
+oobo hooks pre-push "$@" 2>>"${XDG_DATA_HOME:-$HOME/.local/share}/oobo/logs"/hooks.log || true
+```
+
+Runs before every push to:
+
+1. Push the `oobo/anchors/v1` orphan branch
+2. Retry any pending anchor syncs
+
+<Note>
+  Hooks are installed per-project during `oobo setup` or when oobo first intercepts a commit in a new repo. If a hook already exists, oobo chains with it by creating a backup and calling both.
+</Note>
+
+## Troubleshooting
+
+### Hooks not firing
+
+Check if hooks are installed:
+
+```bash
+oobo inspect --agent
+```
+
+If `hooks_installed` check fails, reinstall:
+
+```bash
+oobo setup
+```
+
+### Sessions not linking to commits
+
+Check for active sessions:
+
+```bash
+# Inside a git repo
+ls .git/oobo-sessions/
+```
+
+If empty, hooks are not firing. Verify tool config files contain `oobo` commands.
+
+### Stale session files
+
+Oobo auto-cleans files older than 24 hours. To clean manually:
+
+```bash
+rm .git/oobo-sessions/*.json
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JSON Output" icon="bracket-curly" href="/agents/json-output">
+    Complete reference for parsing anchor metadata
+  </Card>
+  <Card title="Skill File" icon="book" href="/agents/skill-file">
+    How agents discover oobo capabilities
+  </Card>
+</CardGroup>

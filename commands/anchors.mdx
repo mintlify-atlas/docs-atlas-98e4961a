@@ -1,0 +1,297 @@
+---
+title: anchors
+description: View enriched commit history with AI context and code attribution
+---
+
+## Overview
+
+The `anchors` command shows enriched commit history with AI context. Each anchor extends a git commit with:
+
+- Linked AI sessions
+- Token counts
+- AI vs human code attribution
+- Model information
+- Contributors (humans + agents)
+
+```bash
+oobo anchors               # Show recent commits with AI context
+oobo a -n 20               # Short alias, show last 20
+oobo anchors --agent       # JSON output
+```
+
+<Note>
+  `anchors` has a short alias: `a`
+</Note>
+
+## What is an Anchor?
+
+An **anchor** is oobo's core primitive — it extends a git commit with AI context:
+
+```
+Git:   commit = diff(files)
+Oobo:  anchor = commit + sessions + tokens + attribution
+```
+
+Each anchor records:
+- Which AI sessions contributed
+- Token counts per session
+- Code attribution (AI vs human lines)
+- Model used
+- Session duration
+- Files changed
+
+Anchors live in a local SQLite database **and** on a git orphan branch (`oobo/anchors/v1`) that travels with the repo.
+
+## Command Syntax
+
+```bash
+oobo anchors [OPTIONS]
+```
+
+<ParamField path="-n, --limit" type="number" default="10">
+  Number of commits to show.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON.
+</ParamField>
+
+## Examples
+
+### Show recent anchors
+
+```bash
+oobo anchors
+```
+
+Output:
+```
+◆ abc12de fix auth middleware
+  by: dev + cursor (claude-sonnet-4-20250514)
+  +120 / -15  (2 files)  85% AI
+  ai: +102/-12  human: +18/-3
+  ⤷ abc12def (cursor, claude-sonnet-4-20250514) 12.5k+8.4k tokens
+
+● def3456 update README
+  author: dev <dev@example.com>
+  +8 / -2  (1 files)
+```
+
+<Tip>
+  **◆** indicates AI-assisted commits. **●** indicates human-only commits.
+</Tip>
+
+### Show more commits
+
+```bash
+oobo a -n 20
+```
+
+### JSON output for agents
+
+```bash
+oobo anchors --agent
+```
+
+<CodeGroup>
+```bash Human Output
+oobo anchors
+```
+
+```bash Agent (JSON)
+oobo anchors --agent
+```
+
+```json Response
+[
+  {
+    "commit_hash": "abc12def3456789012345678901234567890abcd",
+    "message": "fix auth middleware",
+    "author": "dev <dev@example.com>",
+    "author_type": "assisted",
+    "contributors": [
+      {
+        "name": "dev",
+        "role": "human",
+        "model": null
+      },
+      {
+        "name": "cursor",
+        "role": "agent",
+        "model": "claude-sonnet-4-20250514"
+      }
+    ],
+    "branch": "main",
+    "committed_at": 1709896200,
+    "files_changed": ["src/auth.rs", "src/middleware.rs"],
+    "lines_added": 120,
+    "lines_deleted": 15,
+    "file_changes": [
+      {
+        "path": "src/auth.rs",
+        "lines_added": 102,
+        "lines_deleted": 12,
+        "attribution": "ai",
+        "agent": "cursor"
+      },
+      {
+        "path": "src/middleware.rs",
+        "lines_added": 18,
+        "lines_deleted": 3,
+        "attribution": "human",
+        "agent": null
+      }
+    ],
+    "ai_lines_added": 102,
+    "ai_lines_deleted": 12,
+    "human_lines_added": 18,
+    "human_lines_deleted": 3,
+    "ai_percentage": 85.0,
+    "sessions": [
+      {
+        "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+        "agent": "cursor",
+        "model": "claude-sonnet-4-20250514",
+        "link_type": "explicit",
+        "input_tokens": 12500,
+        "output_tokens": 8400,
+        "files_touched": ["src/auth.rs"]
+      }
+    ],
+    "summary": "Added JWT validation to auth middleware",
+    "intent": "fix"
+  }
+]
+```
+</CodeGroup>
+
+## Output Fields
+
+### Human Output
+
+Each anchor shows:
+
+1. **Indicator** - ◆ (AI-assisted) or ● (human-only)
+2. **Commit hash** - First 7 characters (yellow)
+3. **Message** - Commit message
+4. **Contributors** - Humans + agents with models
+5. **Diff stats** - Lines added/deleted, files changed, AI percentage
+6. **Attribution** - AI vs human line counts
+7. **Sessions** - Linked sessions with tokens
+8. **Summary** - AI-generated summary (if available)
+
+### JSON Output
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commit_hash` | string | Full commit SHA |
+| `message` | string | Commit message |
+| `author` | string | Git author |
+| `author_type` | string | `human`, `assisted`, or `autonomous` |
+| `contributors` | array | Humans and agents who contributed |
+| `branch` | string | Branch name |
+| `committed_at` | number | Unix timestamp |
+| `files_changed` | array | List of changed file paths |
+| `lines_added` | number | Total lines added |
+| `lines_deleted` | number | Total lines deleted |
+| `file_changes` | array | Per-file attribution |
+| `ai_lines_added` | number | Lines added by AI |
+| `ai_lines_deleted` | number | Lines deleted by AI |
+| `human_lines_added` | number | Lines added by human |
+| `human_lines_deleted` | number | Lines deleted by human |
+| `ai_percentage` | number | Percentage of code written by AI (0-100) |
+| `sessions` | array | Linked AI sessions |
+| `summary` | string | AI-generated summary |
+| `intent` | string | Commit intent (fix, feat, refactor, etc.) |
+
+### Contributor Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Contributor name (human or tool name) |
+| `role` | string | `human` or `agent` |
+| `model` | string | AI model (for agents only) |
+
+### Session Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_id` | string | Full session UUID |
+| `agent` | string | Tool name (cursor, claude, etc.) |
+| `model` | string | AI model used |
+| `link_type` | string | `explicit` or `correlation` |
+| `input_tokens` | number | Input tokens consumed |
+| `output_tokens` | number | Output tokens generated |
+| `files_touched` | array | Files modified in session |
+
+## Author Types
+
+- **human** - No AI involvement detected
+- **assisted** - Collaboration between human and AI
+- **autonomous** - Fully AI-generated (e.g., agent commit)
+
+## How Anchors Are Created
+
+Anchors are recorded automatically when you commit through oobo:
+
+```bash
+oobo commit -m "fix auth middleware"
+# 1. Execute: git commit
+# 2. Detect write operation
+# 3. Read AI sessions from local tool storage
+# 4. Build anchor: commit + sessions + tokens + attribution
+# 5. Write anchor to local DB + git orphan branch
+```
+
+<Note>
+  Anchors are created **after** the commit succeeds, so they never interfere with your git workflow.
+</Note>
+
+## Syncing Anchors
+
+Anchors sync automatically via the `oobo/anchors/v1` orphan branch:
+
+- **First commit** - Creates orphan branch
+- **Every push** - Pushes anchors
+- **Clone/pull** - Import with `oobo sync`
+
+```bash
+oobo sync     # Import anchors from orphan branch
+```
+
+## Use Cases
+
+### Review AI contributions
+
+```bash
+oobo anchors
+```
+
+### Export commit history with AI context
+
+```bash
+oobo anchors --agent > history.json
+```
+
+### Find commits by AI percentage
+
+```bash
+oobo anchors --agent | jq '.[] | select(.ai_percentage > 80)'
+```
+
+### See which sessions contributed to a commit
+
+```bash
+oobo anchors --agent | jq '.[] | select(.commit_hash | startswith("abc12")) | .sessions'
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    View the AI sessions linked to your commits
+  </Card>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    See code attribution and AI percentage across your project
+  </Card>
+</CardGroup>

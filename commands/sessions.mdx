@@ -1,0 +1,316 @@
+---
+title: sessions
+description: Browse, search, and export AI chat sessions
+---
+
+## Overview
+
+The `sessions` command lets you browse, search, and export AI chat sessions. By default it launches an interactive TUI. With `--agent`, it returns structured JSON.
+
+```bash
+oobo sessions              # Interactive TUI
+oobo sessions --agent      # JSON output
+oobo sessions --all        # All projects
+```
+
+## Subcommands
+
+### sessions list
+
+List sessions for the current project (or all projects with `--all`).
+
+```bash
+oobo sessions list
+oobo sessions list --all
+oobo sessions list --agent
+```
+
+<ParamField path="--all" type="boolean" default="false">
+  Show sessions from all projects instead of just the current project.
+</ParamField>
+
+<ParamField path="--tool" type="string" optional>
+  Filter by tool (cursor, claude, gemini, windsurf, aider, copilot, zed, trae, codex, opencode).
+</ParamField>
+
+<ParamField path="-n, --limit" type="number" optional>
+  Maximum number of sessions to return.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON for AI agents and scripts.
+</ParamField>
+
+<CodeGroup>
+```bash Human (TUI)
+oobo sessions list
+```
+
+```bash Agent (JSON)
+oobo sessions list --agent
+```
+
+```json Response
+[
+  {
+    "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+    "name": "fix auth middleware",
+    "source": "cursor",
+    "mode": "composer",
+    "model": "claude-sonnet-4-20250514",
+    "input_tokens": 12500,
+    "output_tokens": 8400,
+    "duration_secs": 180,
+    "files_touched": ["src/auth.rs", "src/middleware.rs"],
+    "tool_calls": 7,
+    "project_path": "/Users/dev/myapp",
+    "created_at": "2026-03-08T10:30:00Z",
+    "updated_at": "2026-03-08T10:33:00Z",
+    "is_estimated": false
+  }
+]
+```
+</CodeGroup>
+
+### sessions show
+
+Show a session's full conversation.
+
+```bash
+oobo sessions show <id>
+oobo sessions show abc12def            # prefix match
+oobo sessions show abc12def --agent    # JSON output
+```
+
+<ParamField path="id" type="string" required>
+  Session ID or prefix. Full UUIDs and short prefixes both work.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON with full message array.
+</ParamField>
+
+<CodeGroup>
+```bash Human (TUI)
+oobo sessions show abc12def
+```
+
+```bash Agent (JSON)
+oobo sessions show abc12def --agent
+```
+
+```json Response
+{
+  "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+  "name": "fix auth middleware",
+  "source": "cursor",
+  "mode": "composer",
+  "model": "claude-sonnet-4-20250514",
+  "input_tokens": 12500,
+  "output_tokens": 8400,
+  "duration_secs": 180,
+  "files_touched": ["src/auth.rs"],
+  "tool_calls": 7,
+  "project_path": "/Users/dev/myapp",
+  "created_at": "2026-03-08T10:30:00Z",
+  "updated_at": "2026-03-08T10:33:00Z",
+  "is_estimated": false,
+  "message_count": 8,
+  "messages": [
+    {
+      "role": "user",
+      "text": "The auth middleware is rejecting valid tokens"
+    },
+    {
+      "role": "assistant",
+      "text": "I'll help you debug the auth middleware..."
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### sessions search
+
+Search sessions by keyword. Matches session name, first message, and transcript content.
+
+```bash
+oobo sessions search "auth bug"
+oobo sessions search "auth bug" --all
+oobo sessions search "auth bug" --agent
+```
+
+<ParamField path="query" type="string" required>
+  Search query. Matches session name, ID, source, mode, and first message.
+</ParamField>
+
+<ParamField path="--all" type="boolean" default="false">
+  Search across all projects instead of just the current project.
+</ParamField>
+
+<ParamField path="-n, --limit" type="number" default="20">
+  Maximum number of results to return.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON.
+</ParamField>
+
+<CodeGroup>
+```bash Human Output
+oobo sessions search "auth bug"
+```
+
+```bash Agent (JSON)
+oobo sessions search "auth bug" --agent
+```
+
+```json Response
+[
+  {
+    "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+    "name": "fix auth middleware",
+    "source": "cursor",
+    "mode": "composer",
+    "model": "claude-sonnet-4-20250514",
+    "input_tokens": 12500,
+    "output_tokens": 8400,
+    "project_path": "/Users/dev/myapp",
+    "created_at": "2026-03-08T10:30:00Z",
+    "updated_at": "2026-03-08T10:33:00Z",
+    "matched_on": "name"
+  }
+]
+```
+</CodeGroup>
+
+### sessions export
+
+Export a session to a file in markdown or JSON format.
+
+```bash
+oobo sessions export <id> --format md --out chat.md
+oobo sessions export abc12def --format json --out session.json
+oobo sessions export abc12def                  # prints to stdout
+```
+
+<ParamField path="id" type="string" required>
+  Session ID or prefix.
+</ParamField>
+
+<ParamField path="--format" type="string" default="md">
+  Output format: `md` (markdown) or `json`.
+</ParamField>
+
+<ParamField path="--out" type="string" optional>
+  Output file path. If omitted, prints to stdout.
+</ParamField>
+
+<CodeGroup>
+```bash Export Markdown
+oobo sessions export abc12def --format md --out chat.md
+```
+
+```bash Export JSON
+oobo sessions export abc12def --format json --out session.json
+```
+</CodeGroup>
+
+## Default Behavior
+
+When you run `oobo sessions` with no subcommand, it defaults to `sessions list` with an interactive TUI:
+
+```bash
+oobo sessions              # same as: oobo sessions list
+oobo sessions --all        # same as: oobo sessions list --all
+oobo sessions --agent      # same as: oobo sessions list --agent
+```
+
+## Interactive TUI
+
+The TUI shows:
+
+- **Source** - Tool that created the session (Cursor, Claude, Gemini, etc.)
+- **Model** - AI model used (claude-sonnet-4, gpt-4, etc.)
+- **Tokens** - Input + output token counts
+- **Duration** - Session length
+- **Title** - Session name or first message
+
+Navigation:
+- **Arrow keys** - Move between sessions
+- **Enter** - View full conversation
+- **Esc** - Exit
+
+## Use Cases
+
+### Find recent sessions
+
+```bash
+oobo sessions
+```
+
+### Search for a specific conversation
+
+```bash
+oobo sessions search "authentication"
+```
+
+### Get session IDs for scripting
+
+```bash
+oobo sessions list --agent | jq -r '.[].session_id'
+```
+
+### Export a session for sharing
+
+```bash
+oobo sessions export abc12def --format md --out review.md
+```
+
+### View sessions from all projects
+
+```bash
+oobo sessions --all
+```
+
+### Filter by tool
+
+```bash
+oobo sessions list --tool cursor --agent
+```
+
+## Output Fields
+
+<Tip>
+  All timestamp fields use ISO 8601 format (`2026-03-08T10:30:00Z`).
+</Tip>
+
+### JSON Session Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_id` | string | Full session UUID |
+| `name` | string | Session title |
+| `source` | string | Tool name (cursor, claude, gemini, etc.) |
+| `mode` | string | Session mode (composer, chat, agent, etc.) |
+| `model` | string | AI model used |
+| `input_tokens` | number | Input tokens consumed |
+| `output_tokens` | number | Output tokens generated |
+| `duration_secs` | number | Session duration in seconds |
+| `files_touched` | array | List of files modified |
+| `tool_calls` | number | Number of tool/function calls |
+| `project_path` | string | Absolute path to project |
+| `created_at` | string | ISO 8601 timestamp |
+| `updated_at` | string | ISO 8601 timestamp |
+| `is_estimated` | boolean | True if tokens are estimated (tiktoken) |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Share Sessions" icon="share-nodes" href="/commands/share">
+    Learn how to share redacted sessions
+  </Card>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    View token usage analytics across all sessions
+  </Card>
+</CardGroup>

@@ -1,0 +1,424 @@
+---
+title: Skill File
+description: How agents discover and use the oobo skill file
+---
+
+Oobo installs a skill file at `~/.agents/skills/oobo/SKILL.md` that tells AI coding agents how to use oobo. Agents that scan this directory automatically discover oobo's capabilities.
+
+## What is the Skill File?
+
+The skill file is a markdown document with YAML frontmatter that describes:
+
+- What oobo does
+- How to check if it's installed
+- How to install it
+- Every available command with examples
+- JSON response formats
+- Agent configuration recommendations
+
+It follows a standard format used by AI coding tools like **Cursor**, **Claude Code**, **Codex CLI**, **Gemini CLI**, and **OpenCode**.
+
+## Location
+
+```bash
+~/.agents/skills/oobo/SKILL.md
+```
+
+This path is part of the emerging standard for agent skill discovery:
+
+```
+~/.agents/
+└── skills/
+    ├── oobo/
+    │   └── SKILL.md
+    ├── terraform/
+    │   └── SKILL.md
+    └── docker/
+        └── SKILL.md
+```
+
+Agents scan `~/.agents/skills/` to find installed tools and their capabilities.
+
+## When is it Installed?
+
+The skill file is installed automatically during:
+
+```bash
+oobo setup
+```
+
+It's also installed by the install script when using the `--agent` flag:
+
+```bash
+curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+```
+
+<Note>
+  If the skill file is missing, run `oobo setup` to reinstall it.
+</Note>
+
+## Skill File Format
+
+The skill file uses YAML frontmatter for metadata:
+
+```yaml
+---
+name: oobo
+description: AI development control plane. Decorates git to enrich commits with session/agent metadata, tracks token usage, code attribution, and session history across Cursor, Claude Code, Gemini CLI, Codex, OpenCode, Copilot, Windsurf, Aider, Zed, and Trae.
+metadata:
+  author: oobo
+  version: "0.1.0"
+install:
+  check: command -v oobo
+  run: curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+---
+```
+
+**Frontmatter fields:**
+
+- `name`: Tool name
+- `description`: One-line summary of what the tool does
+- `metadata.author`: Author or organization
+- `metadata.version`: Current version
+- `install.check`: Command to check if installed (should exit 0 if installed)
+- `install.run`: Command to install the tool
+
+Agents parse this frontmatter to:
+
+1. Detect if oobo is installed (`install.check`)
+2. Install oobo if needed (`install.run`)
+3. Learn what oobo does (`description`)
+
+## Content Structure
+
+The skill file contains:
+
+### 1. Introduction
+
+```markdown
+# Oobo — AI Development Control Plane
+
+You have access to `oobo`, a local CLI that decorates git to automatically enrich commits with AI session metadata, tracks tool usage, token counts, code attribution, and session history. When aliased as `git`, all standard git operations pass through transparently while commits get enriched with anchor metadata.
+
+If `oobo` is not installed, run: `curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent`
+This returns JSON: `{"status":"ok","version":"...","binary":"...","platform":"..."}`
+```
+
+### 2. The --agent Flag
+
+```markdown
+## The --agent flag
+
+All commands accept `--agent` for structured JSON output. Always use `--agent` instead of `--json`.
+
+```bash
+oobo <command> --agent    # Forces JSON output on any command
+```
+```
+
+### 3. Command Reference
+
+Complete list of commands with examples:
+
+```markdown
+## Commands
+
+### Enriched Commit History
+
+```bash
+oobo anchors --agent                               # Enriched commit log as JSON
+oobo anchors --agent -n 20                         # Limit to N commits
+oobo a --agent -n 5                                # Short alias
+```
+
+### Sessions
+
+```bash
+oobo sessions --agent                              # Current project sessions as JSON
+oobo sessions list --agent --all                   # All projects
+oobo sessions list --agent --all --tool cursor -n 10 # Filter by tool, limit
+oobo sessions show <session_id> --agent            # Full conversation + stats
+oobo sessions search "keyword" --all --agent       # Search by name/content
+oobo sessions export <session_id> --format md      # Export as markdown
+```
+```
+
+### 4. JSON Response Fields
+
+Detailed field descriptions for each command:
+
+```markdown
+## JSON Response Fields
+
+**anchors**: `commit_hash`, `message`, `author`, `author_type`, `branch`, `committed_at`, `contributors[]` (each with `name`, `role`, `model`), `files_changed[]`, `lines_added`, `lines_deleted`, `file_changes[]` (each with `path`, `lines_added`, `lines_deleted`, `attribution` [ai/human/mixed], `agent`), `ai_lines_added`, `ai_lines_deleted`, `human_lines_added`, `human_lines_deleted`, `ai_percentage`, `sessions[]` (each with `session_id`, `agent`, `model`, `link_type`, `input_tokens`, `output_tokens`, `files_touched[]`), `summary`, `intent`
+
+**sessions list**: `session_id`, `name`, `source`, `mode`, `project_path`, `created_at`, `updated_at`, `model`, `input_tokens`, `output_tokens`, `duration_secs`, `is_estimated`, `files_touched`, `tool_calls`
+```
+
+### 5. Agent Configuration
+
+Recommended settings for agents:
+
+```markdown
+## Agent Configuration
+
+Agents should operate with **transparency on** — this is the recommended default for all automated workflows. Transparency on means anchor metadata and redacted transcripts sync to the orphan branch, giving teams complete visibility into AI contributions.
+
+### Recommended agent settings
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `transparency.mode` | `on` | Metadata + redacted transcripts sync |
+| `git.alias_enabled` | `true` | Automatic enrichment on every commit |
+| `--agent` flag | Always use | Structured JSON output for parsing |
+```
+
+## How Agents Use the Skill File
+
+Agents that support skill files will:
+
+<Steps>
+  <Step title="Scan for skills on startup">
+    Agent scans `~/.agents/skills/` and loads all `SKILL.md` files.
+  </Step>
+  
+  <Step title="Parse frontmatter">
+    Extract metadata: name, description, install commands.
+  </Step>
+  
+  <Step title="Check if installed">
+    Run `install.check` command from frontmatter:
+    
+    ```bash
+    command -v oobo
+    ```
+    
+    If exit code is 0, oobo is available.
+  </Step>
+  
+  <Step title="Install if needed">
+    If not installed and the agent needs oobo, run `install.run`:
+    
+    ```bash
+    curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+    ```
+  </Step>
+  
+  <Step title="Use commands from skill file">
+    Agent references command examples and JSON response formats when using oobo.
+  </Step>
+</Steps>
+
+## Example: Agent Installing oobo
+
+Here's how an agent might use the skill file:
+
+```python
+import os
+import yaml
+import subprocess
+
+# 1. Load skill file
+skill_path = os.path.expanduser("~/.agents/skills/oobo/SKILL.md")
+with open(skill_path) as f:
+    content = f.read()
+    
+# 2. Parse frontmatter
+# (frontmatter is between --- markers)
+frontmatter = yaml.safe_load(content.split("---")[1])
+
+# 3. Check if installed
+check_cmd = frontmatter["install"]["check"]
+result = subprocess.run(check_cmd, shell=True)
+
+if result.returncode != 0:
+    # 4. Install oobo
+    install_cmd = frontmatter["install"]["run"]
+    subprocess.run(install_cmd, shell=True)
+    print(f"Installed {frontmatter['name']}")
+
+# 5. Use oobo
+subprocess.run(["oobo", "sessions", "--agent"])
+```
+
+## Viewing the Skill File
+
+To print the skill file contents:
+
+```bash
+oobo agent
+```
+
+This outputs the full skill file to stdout. Agents can also read it directly:
+
+```bash
+cat ~/.agents/skills/oobo/SKILL.md
+```
+
+## Skill File Excerpt
+
+Here's a real excerpt from the oobo skill file:
+
+```markdown
+---
+name: oobo
+description: AI development control plane. Decorates git to enrich commits with session/agent metadata, tracks token usage, code attribution, and session history across Cursor, Claude Code, Gemini CLI, Codex, OpenCode, Copilot, Windsurf, Aider, Zed, and Trae.
+metadata:
+  author: oobo
+  version: "0.1.0"
+install:
+  check: command -v oobo
+  run: curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+---
+
+# Oobo — AI Development Control Plane
+
+You have access to `oobo`, a local CLI that decorates git to automatically enrich commits with AI session metadata, tracks tool usage, token counts, code attribution, and session history. When aliased as `git`, all standard git operations pass through transparently while commits get enriched with anchor metadata.
+
+If `oobo` is not installed, run: `curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent`
+This returns JSON: `{"status":"ok","version":"...","binary":"...","platform":"..."}`
+
+## The --agent flag
+
+All commands accept `--agent` for structured JSON output. Always use `--agent` instead of `--json`.
+
+```bash
+oobo <command> --agent    # Forces JSON output on any command
+```
+
+## Commands
+
+### Enriched Commit History
+
+```bash
+oobo anchors --agent                               # Enriched commit log as JSON
+oobo anchors --agent -n 20                         # Limit to N commits
+oobo a --agent -n 5                                # Short alias
+```
+
+### Sessions
+
+```bash
+oobo sessions --agent                              # Current project sessions as JSON
+oobo sessions list --agent --all                   # All projects
+oobo sessions list --agent --all --tool cursor -n 10 # Filter by tool, limit
+oobo sessions show <session_id> --agent            # Full conversation + stats
+oobo sessions search "keyword" --all --agent       # Search by name/content
+oobo sessions export <session_id> --format md      # Export as markdown
+```
+```
+
+The full skill file contains complete command reference, JSON response formats, agent configuration, and architecture notes.
+
+## Supported Tools with Skill Discovery
+
+These AI coding tools scan `~/.agents/skills/` and can auto-discover oobo:
+
+- **Cursor**: Scans on startup, offers to install skills
+- **Claude Code**: Loads skills from `~/.agents/skills/`
+- **Codex CLI**: Built-in skill system, auto-loads from standard path
+- **Gemini CLI**: Supports skill files for context injection
+- **OpenCode**: Plugin system with skill file support
+
+<Note>
+  The `~/.agents/skills/` directory structure is an emerging standard. As more tools adopt it, oobo will be automatically discoverable by any compliant agent.
+</Note>
+
+## Updating the Skill File
+
+The skill file is updated when you upgrade oobo:
+
+```bash
+oobo update
+```
+
+This downloads the latest oobo version and refreshes the skill file with new commands and updated documentation.
+
+To manually refresh the skill file without upgrading:
+
+```bash
+oobo setup
+```
+
+## Custom Skill Files
+
+If you're building an agent integration, you can extend the skill file by:
+
+1. Reading the existing skill file
+2. Adding custom commands or workflows
+3. Writing to a custom skill directory
+
+**Example: Custom skill for deployment workflows**
+
+```bash
+mkdir -p ~/.agents/skills/oobo-deploy
+cat > ~/.agents/skills/oobo-deploy/SKILL.md << 'EOF'
+---
+name: oobo-deploy
+description: Oobo + deployment workflows for production releases
+install:
+  check: command -v oobo
+  run: curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+---
+
+# Deployment Workflow
+
+When deploying to production:
+
+```bash
+# 1. Get stats for release notes
+oobo stats --since 7d --agent > stats.json
+
+# 2. Get all commits since last release
+oobo anchors --agent -n 50 > anchors.json
+
+# 3. Generate release summary
+python generate_release_notes.py
+```
+EOF
+```
+
+Agents will discover both `oobo` and `oobo-deploy` skills.
+
+## Troubleshooting
+
+### Skill file missing
+
+Reinstall with:
+
+```bash
+oobo setup
+```
+
+Verify installation:
+
+```bash
+ls ~/.agents/skills/oobo/SKILL.md
+```
+
+### Agent not discovering skill
+
+Check agent documentation for skill discovery path. Some tools use:
+
+- `~/.agents/skills/` (standard)
+- `~/.config/<agent>/skills/` (agent-specific)
+- Custom paths via environment variables
+
+### Skill file out of date
+
+Upgrade oobo to refresh the skill file:
+
+```bash
+oobo update
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="book-open" href="/agents/overview">
+    Why oobo is built for agents and key use cases
+  </Card>
+  <Card title="Installation" icon="download" href="/agents/installation">
+    How agents should install and configure oobo
+  </Card>
+</CardGroup>

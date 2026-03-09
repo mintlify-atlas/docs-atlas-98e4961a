@@ -1,0 +1,391 @@
+---
+title: stats
+description: Token usage analytics, AI code attribution, and productivity metrics
+---
+
+## Overview
+
+The `stats` command provides comprehensive analytics:
+
+- **Token usage** - Input/output tokens per tool, model, and project
+- **AI code attribution** - Percentage of code written by AI vs human
+- **Productivity metrics** - Commits per day, lines per day, active days
+- **Cost tracking** - Estimated costs for API usage
+- **Daily trends** - 14-day session and token activity
+
+```bash
+oobo stats                         # Global stats
+oobo stats --agent                  # JSON output
+oobo stats --project myapp          # Per-project
+oobo stats --tool cursor            # Per-tool
+oobo stats --since 30d              # Last 30 days
+```
+
+## Command Syntax
+
+```bash
+oobo stats [OPTIONS]
+```
+
+<ParamField path="--project" type="string" optional>
+  Filter by project name, slug, or path.
+</ParamField>
+
+<ParamField path="--tool" type="string" optional>
+  Filter by tool: `cursor`, `claude`, `gemini`, `windsurf`, `aider`, `copilot`, `zed`, `trae`, `codex`, `opencode`.
+</ParamField>
+
+<ParamField path="--since" type="string" optional>
+  Show stats since this date or duration. Examples: `7d`, `30d`, `2w`, `3m`, `2026-02-01`.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON.
+</ParamField>
+
+## Examples
+
+### Global stats
+
+```bash
+oobo stats
+```
+
+Launches an interactive TUI showing:
+- Total sessions and tokens
+- Per-tool breakdown
+- Top projects
+- Daily activity (last 14 days)
+- AI code percentage
+- Productivity summary
+
+### Per-project stats
+
+```bash
+oobo stats --project myapp
+```
+
+### Per-tool stats
+
+```bash
+oobo stats --tool cursor
+```
+
+### Time-filtered stats
+
+```bash
+oobo stats --since 30d              # Last 30 days
+oobo stats --since 2w               # Last 2 weeks
+oobo stats --since 3m               # Last 3 months
+oobo stats --since 2026-02-01       # Since a specific date
+```
+
+### JSON output for agents
+
+<CodeGroup>
+```bash Global Stats
+oobo stats --agent
+```
+
+```bash Per-Project
+oobo stats --project myapp --agent
+```
+
+```bash Per-Tool
+oobo stats --tool cursor --agent
+```
+
+```json Response
+{
+  "scope": {
+    "project": null,
+    "tool": null
+  },
+  "sessions": 42,
+  "input_tokens": 125000,
+  "output_tokens": 84000,
+  "total_tokens": 209000,
+  "total_cost_usd": 12.45,
+  "total_duration_secs": 7200,
+  "api_usage": {
+    "anthropic": {
+      "input_tokens": 50000,
+      "output_tokens": 30000,
+      "cache_read_tokens": 15000,
+      "cost_usd": 8.50,
+      "days": 30
+    },
+    "openai": {
+      "input_tokens": 25000,
+      "output_tokens": 18000,
+      "cache_read_tokens": 0,
+      "cost_usd": 3.20,
+      "days": 30
+    }
+  },
+  "per_tool": [
+    {
+      "tool": "cursor",
+      "sessions": 25,
+      "input_tokens": 75000,
+      "output_tokens": 50000,
+      "cost_usd": 7.50
+    },
+    {
+      "tool": "claude",
+      "sessions": 17,
+      "input_tokens": 50000,
+      "output_tokens": 34000,
+      "cost_usd": 4.95
+    }
+  ],
+  "per_model": [
+    {
+      "model": "claude-sonnet-4-20250514",
+      "sessions": 30,
+      "input_tokens": 90000,
+      "output_tokens": 60000,
+      "cost_usd": 9.00,
+      "pct_of_total": 71.4
+    },
+    {
+      "model": "gpt-4o",
+      "sessions": 12,
+      "input_tokens": 35000,
+      "output_tokens": 24000,
+      "cost_usd": 3.45,
+      "pct_of_total": 28.6
+    }
+  ],
+  "ai_code": {
+    "total_commits": 150,
+    "total_lines": 12500,
+    "ai_lines": 8750,
+    "human_lines": 3750,
+    "ai_percentage": 70.0
+  },
+  "productivity": {
+    "active_days": 28,
+    "total_commits": 150,
+    "lines_added": 12500,
+    "lines_deleted": 3200,
+    "commits_per_day": 5.36,
+    "lines_per_day": 446.43
+  },
+  "daily": [
+    {
+      "date": "2026-03-08",
+      "sessions": 5,
+      "input_tokens": 8500,
+      "output_tokens": 6200,
+      "cost_usd": 0.85
+    },
+    {
+      "date": "2026-03-07",
+      "sessions": 3,
+      "input_tokens": 5200,
+      "output_tokens": 3800,
+      "cost_usd": 0.52
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Output Fields
+
+### Summary Metrics
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `scope` | object | Filter scope (project, tool) |
+| `sessions` | number | Total session count |
+| `input_tokens` | number | Total input tokens |
+| `output_tokens` | number | Total output tokens |
+| `total_tokens` | number | Sum of input + output |
+| `total_cost_usd` | number | Estimated cost in USD |
+| `total_duration_secs` | number | Total session duration |
+
+### API Usage
+
+Remote API usage from tool providers (last 30 days):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `input_tokens` | number | Input tokens from API |
+| `output_tokens` | number | Output tokens from API |
+| `cache_read_tokens` | number | Prompt cache reads (Anthropic) |
+| `cost_usd` | number | Actual cost from API |
+| `days` | number | Number of days covered |
+
+### Per-Tool Breakdown
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tool` | string | Tool name |
+| `sessions` | number | Sessions for this tool |
+| `input_tokens` | number | Input tokens |
+| `output_tokens` | number | Output tokens |
+| `cost_usd` | number | Estimated cost |
+
+### Per-Model Breakdown
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `model` | string | Model identifier |
+| `sessions` | number | Sessions using this model |
+| `input_tokens` | number | Input tokens |
+| `output_tokens` | number | Output tokens |
+| `cost_usd` | number | Estimated cost |
+| `pct_of_total` | number | Percentage of total output tokens |
+
+### AI Code Attribution
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_commits` | number | Total commits tracked |
+| `total_lines` | number | Total lines changed |
+| `ai_lines` | number | Lines written by AI |
+| `human_lines` | number | Lines written by human |
+| `ai_percentage` | number | Percentage of code written by AI (0-100) |
+
+### Productivity Metrics
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `active_days` | number | Days with at least one commit |
+| `total_commits` | number | Total commits |
+| `lines_added` | number | Total lines added |
+| `lines_deleted` | number | Total lines deleted |
+| `commits_per_day` | number | Average commits per active day |
+| `lines_per_day` | number | Average lines per active day |
+
+### Daily Stats
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | Date (YYYY-MM-DD) |
+| `sessions` | number | Sessions on this day |
+| `input_tokens` | number | Input tokens |
+| `output_tokens` | number | Output tokens |
+| `cost_usd` | number | Estimated cost |
+
+## Data Sources
+
+Token accuracy varies by tool:
+
+| Tool | Token Source | Cost Accuracy |
+|------|--------------|---------------|
+| Claude Code | Native telemetry | Exact |
+| Codex CLI | Native telemetry | Exact |
+| OpenCode | Native telemetry | Exact |
+| Gemini CLI | Native telemetry | Estimated |
+| Aider | Native telemetry | Exact |
+| Zed | Native telemetry | Exact |
+| Cursor | Estimated (tiktoken) | Estimated |
+| Copilot | Discovery only | N/A |
+| Windsurf | Discovery only | N/A |
+| Trae | Discovery only | Partial |
+
+<Note>
+  **Native telemetry** sources provide exact token counts from the tool's own logs. **Estimated** sources use tiktoken for approximation.
+</Note>
+
+## Interactive TUI
+
+The TUI (launched without `--agent`) shows:
+
+1. **Summary** - Sessions, tokens, cost, duration
+2. **Per-Tool** - Breakdown by AI tool
+3. **Top Projects** - Top 10 projects by token usage
+4. **Daily Activity** - Last 14 days of sessions and tokens
+5. **AI Code %** - Percentage of code written by AI
+6. **Productivity** - Commits/day, lines/day, active days
+7. **Per-Model** - Breakdown by AI model
+
+## Use Cases
+
+### Track monthly token usage
+
+```bash
+oobo stats --since 30d
+```
+
+### Compare tools
+
+```bash
+oobo stats --agent | jq '.per_tool'
+```
+
+### Find your most active project
+
+```bash
+oobo stats --agent | jq '.per_tool | sort_by(.sessions) | reverse | .[0]'
+```
+
+### Calculate AI code percentage
+
+```bash
+oobo stats --agent | jq '.ai_code.ai_percentage'
+```
+
+### Export stats for reporting
+
+```bash
+oobo stats --agent > stats.json
+```
+
+### See cost per project
+
+```bash
+oobo stats --project myapp --agent | jq '.total_cost_usd'
+```
+
+## Time Filters
+
+The `--since` flag accepts:
+
+- **Relative durations**: `7d`, `30d`, `2w`, `3m`
+  - `d` = days
+  - `w` = weeks (7 days)
+  - `m` = months (30 days)
+- **Absolute dates**: `2026-02-01`, `2026-01-15`
+
+```bash
+oobo stats --since 7d       # Last 7 days
+oobo stats --since 2w       # Last 14 days
+oobo stats --since 3m       # Last 90 days
+oobo stats --since 2026-02-01  # Since Feb 1, 2026
+```
+
+## Plain Text Output
+
+When stdout is not a terminal (e.g., piped or redirected), `stats` outputs plain text instead of the TUI:
+
+```bash
+oobo stats | cat
+```
+
+Output:
+```
+oobo stats — all projects
+Sessions:       42
+Input tokens:   125k
+Output tokens:  84k
+Total tokens:   209k
+Total time:     2h 0m
+
+  Cursor         25 sessions    75k in    50k out
+  Claude         17 sessions    50k in    34k out
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    Explore individual AI chat sessions
+  </Card>
+  <Card title="Anchors" icon="anchor" href="/commands/anchors">
+    See AI code attribution per commit
+  </Card>
+</CardGroup>

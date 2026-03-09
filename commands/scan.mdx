@@ -1,0 +1,353 @@
+---
+title: scan
+description: Discover projects and sessions across all AI tools
+---
+
+## Overview
+
+The `scan` command discovers:
+
+- **Projects** - Git repositories with AI tool sessions
+- **Sessions** - Chat sessions from all enabled AI tools
+- **Tool usage** - Which tools are active in each project
+
+It reads from AI tool storage directories (read-only) and indexes sessions in oobo's local database.
+
+```bash
+oobo scan                  # Scan all tools
+oobo scan --project /path  # Scan specific project
+oobo scan --agent          # Suppress interactive output
+```
+
+## Command Syntax
+
+```bash
+oobo scan [OPTIONS]
+```
+
+<ParamField path="--project" type="string" optional>
+  Scan only this project path instead of all tools.
+</ParamField>
+
+<ParamField path="--quiet" type="boolean" default="false">
+  Suppress output.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Suppress interactive output (same as `--quiet`).
+</ParamField>
+
+## Examples
+
+### Full scan
+
+Scan all enabled tools and discover projects:
+
+```bash
+oobo scan
+```
+
+Output:
+```
+scanning all AI tools...
+found 3 project(s), 65 session(s)
+indexing 12 new session(s)...
+indexed 12 session(s)
+```
+
+### Scan specific project
+
+Scan a single project directory:
+
+```bash
+oobo scan --project /Users/dev/myapp
+```
+
+Output:
+```
+scanning project: /Users/dev/myapp
+found 1 project(s), 18 session(s)
+indexing 5 new session(s)...
+indexed 5 session(s)
+```
+
+### Quiet mode (for scripts)
+
+```bash
+oobo scan --quiet
+oobo scan --agent          # same as --quiet
+```
+
+No output, just exit code (0 = success).
+
+## What Scan Does
+
+### 1. Tool Discovery
+
+For each enabled tool, oobo reads:
+
+| Tool | Read Location | Read-Only |
+|------|---------------|----------|
+| Cursor | `~/Library/Application Support/Cursor/User/workspaceStorage/*/state.vscdb` | ✓ |
+| Claude Code | `~/Library/Application Support/Claude/claude_desktop_config.json` | ✓ |
+| Gemini CLI | `~/.gemini/sessions/` | ✓ |
+| OpenCode | `~/.config/opencode/sessions/` | ✓ |
+| Codex CLI | `~/.codex/history/` | ✓ |
+| Aider | `~/.aider/` | ✓ |
+| Copilot | VS Code workspace storage | ✓ |
+| Windsurf | `~/Library/Application Support/Windsurf/` | ✓ |
+| Zed | `~/.config/zed/` | ✓ |
+| Trae | `~/.trae/sessions/` | ✓ |
+
+<Note>
+  Oobo **never writes** to AI tool directories. All reads are read-only.
+</Note>
+
+### 2. Project Detection
+
+Oobo identifies projects by:
+
+1. **Git root** - Directories with `.git`
+2. **Session project path** - Embedded in session metadata
+3. **Workspace storage** - Tool-specific project tracking
+
+Each project is assigned:
+- **ID (slug)** - Unique identifier (e.g., `myapp-1234567890`)
+- **Name** - Directory name
+- **Path** - Absolute path
+- **Git remote** - Remote URL (if available)
+- **Tools** - List of detected tools
+
+### 3. Session Indexing
+
+For each new session, oobo:
+
+1. **Reads metadata** - Session ID, timestamps, tool, mode
+2. **Stores in database** - Local SQLite at `~/.oobo/oobo.db`
+3. **Computes tokens** - Runs `oobo index` for new sessions
+4. **Links to project** - Associates session with project
+
+Sessions already in the database are skipped.
+
+### 4. Auto-Indexing
+
+After discovery, `scan` automatically runs `oobo index` on new sessions to compute:
+
+- Token counts (input/output)
+- Model information
+- Duration
+- Files touched
+- Tool/function calls
+
+## Scan Results
+
+```bash
+oobo scan
+```
+
+Typical output:
+```
+scanning all AI tools...
+found 3 project(s), 65 session(s)
+indexing 12 new session(s)...
+indexed 12 session(s)
+```
+
+### What the numbers mean:
+
+- **Projects found** - Git repos with AI sessions
+- **Sessions found** - Total sessions across all tools
+- **New sessions** - Sessions not yet in database
+- **Indexed** - Sessions with computed token stats
+
+## Use Cases
+
+### Initial setup
+
+Run after installing oobo or adding a new AI tool:
+
+```bash
+oobo setup
+oobo scan       # Discover existing sessions
+```
+
+### Daily sync
+
+Run periodically to catch new sessions:
+
+```bash
+oobo scan
+```
+
+### Add new project
+
+When you start using AI tools in a new project:
+
+```bash
+cd /path/to/new-project
+oobo scan --project .
+```
+
+### Refresh after tool update
+
+If an AI tool updates and changes session storage:
+
+```bash
+oobo scan
+```
+
+### Scripted discovery
+
+For automation:
+
+```bash
+#!/bin/bash
+oobo scan --quiet
+if [ $? -eq 0 ]; then
+  echo "Scan successful"
+fi
+```
+
+## Performance
+
+### Speed
+
+- **Fast** - Only scans tool directories (no git traversal)
+- **Incremental** - Skips already-indexed sessions
+- **Parallel** - Scans multiple tools concurrently
+
+### Storage
+
+- **Local only** - All data stays in `~/.oobo/oobo.db`
+- **No network** - Unless remote server is configured
+
+### Frequency
+
+Recommended:
+- **After setup** - Initial discovery
+- **Weekly** - Catch new sessions
+- **After tool changes** - When you install/update AI tools
+
+<Tip>
+  **No need to run constantly** - oobo automatically captures sessions when you commit through it.
+</Tip>
+
+## What Gets Indexed
+
+### Per Session
+
+- Session ID (UUID)
+- Tool/source (cursor, claude, etc.)
+- Project path
+- Session name/title
+- Mode (chat, composer, agent, etc.)
+- Created/updated timestamps
+- Message count
+- First message preview
+
+### Per Project
+
+- Project ID (slug)
+- Name (directory name)
+- Absolute path
+- Git remote URL
+- Tools detected
+- Last seen timestamp
+
+## Scan vs Index
+
+| Command | Purpose | What it does |
+|---------|---------|-------------|
+| `scan` | **Discover** sessions | Finds new sessions, adds to DB |
+| `index` | **Compute** analytics | Calculates tokens, duration, costs |
+
+`scan` runs `index` automatically on new sessions.
+
+```bash
+oobo scan       # Discover + index new sessions
+oobo index      # Re-compute analytics for all sessions
+```
+
+## Ignored Projects
+
+To stop tracking a project:
+
+```bash
+cd /path/to/project
+oobo ignore
+```
+
+Ignored projects are skipped during `scan`.
+
+To re-enable:
+
+```bash
+cd /path/to/project
+oobo unignore
+oobo scan
+```
+
+## Troubleshooting
+
+### No sessions found
+
+If scan finds 0 sessions:
+
+1. **Check tool config** - Verify tools are enabled in `~/.oobo/config.toml`
+2. **Use the tools** - Create at least one session
+3. **Check paths** - Ensure tools are in standard locations
+
+```bash
+oobo sources    # Check which tools are detected
+```
+
+### Missing project
+
+If a project isn't discovered:
+
+1. **Check git** - Ensure directory has `.git`
+2. **Use AI tool** - Create at least one session in the project
+3. **Scan manually** - `oobo scan --project /path/to/project`
+
+### Sessions not indexed
+
+If sessions appear but have no token counts:
+
+```bash
+oobo index --force    # Re-index all sessions
+```
+
+### Aider hint
+
+If you see:
+
+```
+hint: Aider sessions found but analytics log is not configured.
+      Add this to ~/.aider.conf.yml for native token/cost tracking:
+
+        analytics_log: ~/.aider/analytics.jsonl
+```
+
+Add the line to your Aider config for better token tracking.
+
+## Privacy
+
+- **Read-only** - Never writes to AI tool directories
+- **Local first** - All data stays in `~/.oobo/`
+- **No telemetry** - Oobo does not phone home
+- **Secret redaction** - Sessions are scrubbed before any sharing
+
+<Warning>
+  Oobo reads session data from AI tools but **never modifies** their files.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Projects" icon="folder" href="/commands/projects">
+    Browse discovered projects
+  </Card>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    View indexed sessions
+  </Card>
+</CardGroup>

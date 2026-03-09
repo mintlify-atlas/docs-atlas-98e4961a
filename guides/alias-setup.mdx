@@ -1,0 +1,247 @@
+---
+title: Alias Setup
+description: Make git automatically use oobo with shell aliases
+---
+
+The `oobo alias` command lets you replace `git` with `oobo` in your shell, so every git command automatically benefits from AI context capture.
+
+## Quick start
+
+```bash
+# Install the alias (adds to your shell rc file)
+oobo alias install
+
+# Restart your shell or source the rc file
+source ~/.zshrc  # or ~/.bashrc, ~/.bash_profile, ~/.config/fish/config.fish
+
+# Now `git` runs `oobo` transparently
+git commit -m "fix auth"
+git push origin main
+```
+
+To remove the alias:
+
+```bash
+oobo alias uninstall
+```
+
+## How it works
+
+The `oobo alias install` command:
+
+1. **Detects your shell** (bash, zsh, or fish)
+2. **Adds an alias** to your shell's RC file:
+   - **Bash/Zsh**: `alias git=oobo`
+   - **Fish**: `alias git oobo` (fish uses space, not `=`)
+3. **Marks the line** with `# oobo alias` so it can be safely uninstalled later
+
+### What gets written
+
+<CodeGroup>
+```bash Bash / Zsh
+alias git=oobo # oobo alias
+```
+
+```fish Fish
+alias git oobo # oobo alias
+```
+</CodeGroup>
+
+The `# oobo alias` comment is used by `oobo alias uninstall` to find and remove the line.
+
+## Supported shells
+
+Oobo detects and modifies the following shell RC files:
+
+| Shell | RC File |
+|-------|--------|
+| **Zsh** | `~/.zshrc` |
+| **Bash** | `~/.bashrc` or `~/.bash_profile` |
+| **Fish** | `~/.config/fish/config.fish` |
+
+The installer checks your `$SHELL` environment variable and existing RC files to determine which to update.
+
+<Note>
+If you use multiple shells, you may need to run `oobo alias install` separately in each shell environment.
+</Note>
+
+## After installing
+
+Once the alias is installed:
+
+```bash
+git status       # actually runs: oobo status
+git commit       # actually runs: oobo commit
+git push         # actually runs: oobo push
+```
+
+Oobo passes all read commands (status, log, diff, etc.) straight through to git with zero overhead. Write commands (commit, push, merge, rebase) trigger anchor creation.
+
+## Uninstalling the alias
+
+```bash
+oobo alias uninstall
+```
+
+This removes all lines containing `# oobo alias` from your shell RC files. After restarting your shell, `git` will run the real git binary again.
+
+## Manual setup (alternative)
+
+If you prefer not to use `oobo alias install`, you can add the alias manually:
+
+<CodeGroup>
+```bash ~/.zshrc or ~/.bashrc
+alias git=oobo
+```
+
+```fish ~/.config/fish/config.fish
+alias git oobo
+```
+</CodeGroup>
+
+Then restart your shell or run:
+
+```bash
+source ~/.zshrc  # or your shell's RC file
+```
+
+## How oobo finds the real git
+
+Oobo needs to know where the real `git` binary is to avoid infinite recursion. It uses `which -a git` to find all `git` binaries in your `PATH` and skips any that are symlinked to `oobo`.
+
+The real git path is stored in `~/.oobo/config.toml`:
+
+```toml
+[git]
+real_git_path = "/usr/bin/git"
+alias_enabled = false
+```
+
+This path is auto-detected on install. If oobo can't find git, it falls back to `git` (assumes git is in PATH).
+
+<Warning>
+If you move or reinstall git, run `oobo setup` again to update the `real_git_path`.
+</Warning>
+
+## Verifying the alias
+
+Check that the alias is active:
+
+```bash
+which git
+# Should show the path to oobo, not /usr/bin/git
+
+type git
+# Should show: git is aliased to `oobo`
+```
+
+Test it:
+
+```bash
+git --version
+# Should print: oobo version x.y.z
+# (not git version x.y.z)
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Alias not found after install">
+    **Cause**: Shell RC file was updated, but the current shell session hasn't reloaded it.
+    
+    **Fix**: Restart your shell or run:
+    ```bash
+    source ~/.zshrc  # or ~/.bashrc, ~/.config/fish/config.fish
+    ```
+  </Accordion>
+
+  <Accordion title="which git still shows /usr/bin/git">
+    **Cause**: The alias isn't loaded in the current session.
+    
+    **Fix**: Check that your shell is reading the correct RC file. Run:
+    ```bash
+    echo $SHELL
+    ```
+    
+    If you use zsh but the alias was added to `.bashrc`, it won't work. Run:
+    ```bash
+    oobo alias install
+    ```
+    again to detect the correct shell.
+  </Accordion>
+
+  <Accordion title="Error: cannot find real git">
+    **Cause**: Oobo couldn't locate the git binary on your system.
+    
+    **Fix**: Install git, or manually set the path in `~/.oobo/config.toml`:
+    ```toml
+    [git]
+    real_git_path = "/path/to/git"
+    ```
+  </Accordion>
+
+  <Accordion title="Uninstall doesn't remove the alias">
+    **Cause**: The alias line doesn't have the `# oobo alias` marker.
+    
+    **Fix**: Manually edit your RC file and remove the `alias git=oobo` line.
+  </Accordion>
+
+  <Accordion title="Multiple shells — which one gets the alias?">
+    **Cause**: `oobo alias install` detects the shell from `$SHELL` and existing RC files.
+    
+    **Fix**: If you use multiple shells (e.g. bash and zsh), you may need to:
+    1. Run `oobo alias install` in each shell environment, OR
+    2. Manually add the alias to all relevant RC files
+  </Accordion>
+</AccordionGroup>
+
+## Should you use the alias?
+
+### Pros
+
+- **Transparent**: No need to remember to use `oobo` instead of `git`
+- **Team-friendly**: Works with existing muscle memory and scripts
+- **Zero overhead**: Read commands pass through instantly
+
+### Cons
+
+- **Potential confusion**: `git` commands now run a different binary
+- **Tooling compatibility**: Some tools that shell out to `git` may not expect a wrapper
+
+<Tip>
+**Recommendation**: Start without the alias. Use `oobo` explicitly for a week. If you find yourself forgetting to use it, install the alias.
+</Tip>
+
+## Using both git and oobo
+
+If you install the alias but occasionally need the real git:
+
+```bash
+# Bypass the alias by using the full path
+/usr/bin/git status
+
+# Or use command to skip aliases
+command git status
+
+# Or prefix with backslash (bash/zsh)
+\git status
+```
+
+To see what `git` resolves to:
+
+```bash
+type git
+# git is aliased to `oobo`
+
+which git
+# /path/to/oobo
+```
+
+## Idempotent install
+
+Running `oobo alias install` multiple times is safe. Oobo checks for the `# oobo alias` marker and won't add duplicate lines.
+
+```bash
+oobo alias install  # adds alias
+oobo alias install  # no-op, already present
+```

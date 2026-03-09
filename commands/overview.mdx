@@ -1,0 +1,207 @@
+---
+title: Commands Overview
+description: Complete guide to oobo's command-line interface for humans and agents
+---
+
+## Command Categories
+
+Oobo provides three categories of commands:
+
+1. **Project commands** - Run inside a git repository
+2. **Global commands** - Work from anywhere
+3. **Git passthrough** - Any git command, with AI context capture on write operations
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    Browse and search AI chat sessions
+  </Card>
+  <Card title="Anchors" icon="anchor" href="/commands/anchors">
+    View enriched commit history with AI context
+  </Card>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    Token usage analytics and code attribution
+  </Card>
+  <Card title="Projects" icon="folder" href="/commands/projects">
+    Manage all tracked projects
+  </Card>
+  <Card title="Setup" icon="gear" href="/commands/setup">
+    First-time configuration wizard
+  </Card>
+  <Card title="Scan" icon="magnifying-glass" href="/commands/scan">
+    Discover projects and sessions
+  </Card>
+  <Card title="Share" icon="share-nodes" href="/commands/share">
+    Share a redacted session
+  </Card>
+  <Card title="Agent" icon="robot" href="/commands/agent">
+    Print AI agent skill file
+  </Card>
+</CardGroup>
+
+## The --agent Flag
+
+Every command supports `--agent` for structured JSON output. This is the primary interface for AI agents and scripting.
+
+```bash
+oobo sessions --agent            # JSON list of sessions
+oobo stats --agent               # Analytics as structured data
+oobo anchors --agent             # Enriched commit history as JSON
+```
+
+<Note>
+  `--agent` is a **global flag** - it works with any command at any position in the argument list.
+</Note>
+
+### How --agent Works
+
+<Tabs>
+  <Tab title="Human Output">
+    ```bash
+    oobo sessions
+    ```
+    
+    Launches an interactive TUI with arrow key navigation, session preview, and full conversation view.
+  </Tab>
+  <Tab title="Agent Output">
+    ```bash
+    oobo sessions --agent
+    ```
+    
+    Returns structured JSON:
+    
+    ```json
+    [
+      {
+        "session_id": "abc12def-3456-...",
+        "name": "fix auth middleware",
+        "source": "cursor",
+        "model": "claude-sonnet-4-20250514",
+        "input_tokens": 12500,
+        "output_tokens": 8400,
+        "created_at": "2026-03-08T10:30:00Z"
+      }
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+## Git Passthrough
+
+Oobo is a **transparent git decorator**. Any command not recognized as an oobo subcommand passes straight through to git:
+
+```bash
+oobo status              # → git status
+oobo log --oneline       # → git log --oneline
+oobo diff HEAD~1         # → git diff HEAD~1
+```
+
+### Write Operations
+
+Write operations (`commit`, `push`, `merge`) execute the git command **and** capture AI context:
+
+```bash
+oobo commit -m "fix auth middleware"
+# 1. Execute: git commit -m "fix auth middleware"
+# 2. Detect write operation
+# 3. Read AI sessions from local tool storage
+# 4. Build anchor: commit + sessions + tokens + attribution
+# 5. Write anchor to local DB + git orphan branch
+# 6. Return git's exit code unchanged
+```
+
+<Tip>
+  Read operations have **zero overhead** - they pass straight through to git with no interception.
+</Tip>
+
+## Project Commands
+
+These commands run inside a git repository and operate on the current project:
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `sessions` | - | Browse AI chat sessions for this project |
+| `anchors` | `a` | Show enriched commit history with AI context |
+| `share` | - | Share a redacted session |
+| `ship` | - | Send AI context to dashboard now |
+| `sync` | - | Import anchors from orphan branch |
+| `ignore` | - | Stop tracking this repo |
+| `unignore` | - | Re-enable tracking |
+
+## Global Commands
+
+These work from anywhere and manage oobo's global state:
+
+| Command | Description |
+|---------|-------------|
+| `setup` | First-time configuration wizard |
+| `projects` | Browse and manage all projects |
+| `stats` | Token usage analytics and attribution |
+| `card` | Developer stats card (shareable) |
+| `scan` | Discover projects and sessions across all tools |
+| `index` | Compute token analytics for sessions |
+| `sources` | Data source status and coverage |
+| `dash` | Configuration overview |
+| `auth` | Configure API keys and remote server |
+| `alias` | Manage git→oobo shell alias |
+| `agent` | Print AI agent skill file |
+| `inspect` | Diagnose and auto-repair issues |
+| `update` | Check for updates or self-update |
+| `version` | Show version info |
+
+## Common Patterns
+
+### Alias git to oobo
+
+For seamless integration, alias `git` itself:
+
+```bash
+oobo alias install      # adds alias git=oobo to your shell rc
+```
+
+Now you can use `git` commands as normal, and oobo will transparently capture AI context on commits.
+
+### Session ID Prefixes
+
+Many commands accept session IDs. You can use short prefixes instead of full UUIDs:
+
+```bash
+oobo sessions show abc12def      # matches abc12def-3456-7890-...
+oobo share abc12                 # prefix match
+```
+
+### Filtering and Scoping
+
+```bash
+oobo sessions --all              # all projects (default: current project)
+oobo stats --project myapp       # per-project stats
+oobo stats --tool cursor         # per-tool stats
+oobo stats --since 30d           # time-filtered
+```
+
+### JSON Everywhere
+
+Add `--agent` to any command for machine-readable output:
+
+```bash
+oobo sessions list --agent
+oobo sessions show <id> --agent
+oobo sessions search <q> --agent
+oobo projects --agent
+oobo stats --agent
+oobo card --agent
+oobo sources --agent
+oobo dash --agent
+oobo version --agent
+oobo inspect --agent
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    Learn how to browse and export AI chat sessions
+  </Card>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    Explore token usage analytics and code attribution
+  </Card>
+</CardGroup>

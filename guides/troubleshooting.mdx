@@ -1,0 +1,502 @@
+---
+title: Troubleshooting
+description: Common issues and how to fix them
+---
+
+This guide covers common issues you might encounter with oobo and how to resolve them.
+
+## Diagnostics command
+
+Oobo includes a built-in diagnostics tool:
+
+```bash
+oobo inspect              # Run diagnostics and show issues
+oobo inspect --fix        # Auto-repair what can be fixed
+oobo inspect --agent      # JSON output for scripting
+```
+
+This command checks for:
+
+- Missing or corrupted config files
+- Database schema issues
+- Orphan branch problems
+- Tool detection failures
+- Permission issues
+
+<Tip>
+**Always run `oobo inspect --fix` first** before manually debugging issues. It can auto-repair most common problems.
+</Tip>
+
+---
+
+## Common issues
+
+<AccordionGroup>
+  <Accordion title="Tool not detected">
+    **Symptoms:**
+    - `oobo sources` shows a tool as "not found"
+    - Sessions from a tool don't appear in `oobo sessions`
+    
+    **Causes:**
+    - Tool is not installed
+    - Tool data directory doesn't exist
+    - Tool is disabled in config
+    - Wrong platform (e.g. Cursor on Linux with Windows paths)
+    
+    **Fix:**
+    
+    1. Check if the tool is actually installed and has been used:
+       ```bash
+       # For Cursor
+       ls ~/Library/Application\ Support/Cursor  # macOS
+       ls ~/.config/Cursor                        # Linux
+       
+       # For Claude Code
+       ls ~/.claude/projects
+       
+       # For Gemini CLI
+       ls ~/.gemini/tmp
+       ```
+    
+    2. Check if the tool is enabled:
+       ```bash
+       grep "\[cursor\]" ~/.oobo/config.toml -A 1
+       # Should show: enabled = true
+       ```
+    
+    3. Re-run setup to detect tools:
+       ```bash
+       oobo setup
+       ```
+    
+    4. Force a scan:
+       ```bash
+       oobo scan
+       ```
+    
+    5. Check detection status:
+       ```bash
+       oobo sources
+       ```
+  </Accordion>
+
+  <Accordion title="Sessions not linking to commits">
+    **Symptoms:**
+    - `oobo anchors` shows commits but no linked sessions
+    - `oobo sessions` shows sessions but they're not in anchors
+    
+    **Causes:**
+    - Session timestamps don't match commit time window
+    - Tool doesn't support agent hooks (time-window correlation used instead)
+    - Session was created after the commit
+    
+    **Fix:**
+    
+    1. Check session timestamps:
+       ```bash
+       oobo sessions --agent | jq '.[] | {id, created_at, updated_at}'
+       ```
+    
+    2. Check commit timestamps:
+       ```bash
+       git log --format='%H %ai' -10
+       ```
+    
+    3. Sessions are linked if they overlap with commit time ± 30 minutes (default window).
+    
+    4. For tools with agent hooks (Cursor, Claude Code, Gemini CLI, OpenCode), ensure hooks are installed:
+       ```bash
+       oobo hooks install
+       ```
+    
+    5. Re-index to recompute session links:
+       ```bash
+       oobo index
+       ```
+  </Accordion>
+
+  <Accordion title="Orphan branch conflicts">
+    **Symptoms:**
+    - Error: `orphan branch oobo/anchors/v1 has conflicts`
+    - `git push` fails with orphan branch errors
+    
+    **Causes:**
+    - Multiple developers using oobo on the same repo
+    - Orphan branch was force-pushed
+    - Local orphan branch diverged from remote
+    
+    **Fix:**
+    
+    1. Check orphan branch status:
+       ```bash
+       git checkout oobo/anchors/v1
+       git status
+       ```
+    
+    2. If branch diverged, pull and merge:
+       ```bash
+       git pull origin oobo/anchors/v1 --no-rebase
+       ```
+    
+    3. If conflicts persist, reset to remote:
+       ```bash
+       git checkout oobo/anchors/v1
+       git reset --hard origin/oobo/anchors/v1
+       ```
+    
+    4. Return to your working branch:
+       ```bash
+       git checkout main
+       ```
+    
+    5. Re-run oobo inspect to verify:
+       ```bash
+       oobo inspect --fix
+       ```
+  </Accordion>
+
+  <Accordion title="Install failures">
+    **Symptoms:**
+    - `curl | bash` install script fails
+    - Binary not found after install
+    - Permission denied errors
+    
+    **Causes:**
+    - Network issues
+    - Unsupported platform
+    - Missing dependencies
+    - `~/.local/bin` not in PATH
+    
+    **Fix:**
+    
+    1. Check platform support:
+       ```bash
+       uname -sm
+       # Supported: Darwin arm64, Darwin x86_64, Linux x86_64, Linux aarch64
+       ```
+    
+    2. Verify binary was downloaded:
+       ```bash
+       ls -la ~/.local/bin/oobo
+       ```
+    
+    3. Check PATH:
+       ```bash
+       echo $PATH | grep -o "$HOME/.local/bin"
+       # Should print: /home/user/.local/bin
+       ```
+    
+    4. Add to PATH if missing (bash/zsh):
+       ```bash
+       echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+       source ~/.bashrc
+       ```
+    
+    5. Manual install as fallback:
+       ```bash
+       # Download from GitHub releases
+       curl -L https://github.com/ooboai/oobo/releases/latest/download/oobo-$(uname -s)-$(uname -m) -o ~/.local/bin/oobo
+       chmod +x ~/.local/bin/oobo
+       ```
+  </Accordion>
+
+  <Accordion title="Config file errors">
+    **Symptoms:**
+    - `oobo: warning: invalid config at ~/.oobo/config.toml`
+    - `oobo: warning: cannot read ~/.oobo/config.toml`
+    
+    **Causes:**
+    - Malformed TOML syntax
+    - Missing required fields
+    - Corrupted file
+    
+    **Fix:**
+    
+    1. Validate TOML syntax:
+       ```bash
+       cat ~/.oobo/config.toml
+       ```
+    
+    2. Common syntax errors:
+       - Missing quotes around strings
+       - Unescaped backslashes in Windows paths
+       - Duplicate section headers
+    
+    3. Reset to defaults:
+       ```bash
+       mv ~/.oobo/config.toml ~/.oobo/config.toml.bak
+       oobo setup
+       ```
+    
+    4. Restore specific settings from backup:
+       ```bash
+       grep api_key ~/.oobo/config.toml.bak
+       # Copy values to new config
+       ```
+  </Accordion>
+
+  <Accordion title="Alias not working">
+    **Symptoms:**
+    - `git --version` shows git version, not oobo version
+    - `which git` shows `/usr/bin/git`, not oobo
+    
+    **Causes:**
+    - Shell RC file not reloaded
+    - Wrong shell RC file modified
+    - Alias not in PATH
+    
+    **Fix:**
+    
+    1. Reload shell config:
+       ```bash
+       source ~/.zshrc  # or ~/.bashrc, ~/.config/fish/config.fish
+       ```
+    
+    2. Verify alias is defined:
+       ```bash
+       grep "alias git" ~/.zshrc ~/.bashrc ~/.config/fish/config.fish 2>/dev/null
+       ```
+    
+    3. Check current shell:
+       ```bash
+       echo $SHELL
+       # Must match the RC file oobo modified
+       ```
+    
+    4. Reinstall alias for correct shell:
+       ```bash
+       oobo alias uninstall
+       oobo alias install
+       ```
+    
+    See [Alias Setup](/guides/alias-setup) for details.
+  </Accordion>
+
+  <Accordion title="Permission denied: config.toml">
+    **Symptoms:**
+    - `oobo: warning: cannot write ~/.oobo/config.toml: Permission denied`
+    
+    **Causes:**
+    - Config file is owned by root or another user
+    - `~/.oobo/` directory has wrong permissions
+    
+    **Fix:**
+    
+    1. Check ownership:
+       ```bash
+       ls -la ~/.oobo/config.toml
+       ```
+    
+    2. Fix ownership:
+       ```bash
+       sudo chown $USER:$USER ~/.oobo/config.toml
+       sudo chown -R $USER:$USER ~/.oobo/
+       ```
+    
+    3. Fix permissions:
+       ```bash
+       chmod 600 ~/.oobo/config.toml
+       chmod 700 ~/.oobo/
+       ```
+  </Accordion>
+
+  <Accordion title="Database locked errors">
+    **Symptoms:**
+    - `Error: database is locked`
+    - Commands hang or fail
+    
+    **Causes:**
+    - Multiple oobo processes running
+    - Previous process crashed
+    - NFS or network filesystem issues
+    
+    **Fix:**
+    
+    1. Check for running oobo processes:
+       ```bash
+       ps aux | grep oobo
+       ```
+    
+    2. Kill stale processes:
+       ```bash
+       killall oobo
+       ```
+    
+    3. Remove lock file if safe:
+       ```bash
+       rm ~/.oobo/db.sqlite-shm ~/.oobo/db.sqlite-wal
+       ```
+    
+    4. If on NFS/network filesystem, move `~/.oobo/` to local disk:
+       ```bash
+       mv ~/.oobo ~/local/.oobo
+       ln -s ~/local/.oobo ~/.oobo
+       ```
+  </Accordion>
+
+  <Accordion title="Transcripts not showing">
+    **Symptoms:**
+    - `oobo sessions show <id>` returns empty or errors
+    - Session list shows sessions but no content
+    
+    **Causes:**
+    - Tool stores transcripts in encrypted format (Windsurf)
+    - Session file was deleted
+    - Tool version changed storage format
+    
+    **Fix:**
+    
+    1. Check if tool supports transcripts:
+       ```bash
+       oobo sources --agent | jq '.[] | select(.name == "cursor") | .features'
+       ```
+    
+    2. For Windsurf: Transcripts are encrypted (`.pb` files). Oobo can detect sessions but cannot read content.
+    
+    3. Re-scan to update session metadata:
+       ```bash
+       oobo scan
+       ```
+    
+    4. Check if file exists:
+       ```bash
+       # Cursor example
+       ls ~/.cursor/projects/*/composer/*.jsonl
+       ```
+  </Accordion>
+
+  <Accordion title="Token stats missing (Aider)">
+    **Symptoms:**
+    - Aider sessions appear but show 0 tokens
+    
+    **Causes:**
+    - Analytics log not configured in Aider
+    
+    **Fix:**
+    
+    Add to `~/.aider.conf.yml`:
+    ```yaml
+    analytics-log: ~/.oobo/aider-analytics.jsonl
+    ```
+    
+    Then run:
+    ```bash
+    oobo scan
+    ```
+    
+    See [Supported Tools > Aider](/guides/supported-tools#aider) for details.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Getting more help
+
+### Enable debug logging
+
+Set the `RUST_LOG` environment variable for verbose output:
+
+```bash
+RUST_LOG=debug oobo scan
+RUST_LOG=trace oobo inspect --fix
+```
+
+Logs are written to `~/.oobo/logs/`.
+
+### Check oobo version
+
+```bash
+oobo version
+oobo version --agent  # JSON output
+```
+
+Ensure you're running the latest version:
+
+```bash
+oobo update
+```
+
+### Inspect database
+
+Query the local database directly:
+
+```bash
+sqlite3 ~/.oobo/db.sqlite "SELECT * FROM sessions LIMIT 5;"
+```
+
+### Report issues
+
+If you encounter a bug:
+
+1. Run diagnostics and save output:
+   ```bash
+   oobo inspect --agent > inspect.json
+   ```
+
+2. Open an issue at [github.com/ooboai/oobo/issues](https://github.com/ooboai/oobo/issues)
+
+3. Include:
+   - Oobo version (`oobo version`)
+   - Platform (`uname -a`)
+   - Steps to reproduce
+   - Relevant logs from `~/.oobo/logs/`
+
+### Community support
+
+For questions and discussions:
+
+- GitHub Discussions: [github.com/ooboai/oobo/discussions](https://github.com/ooboai/oobo/discussions)
+- GitHub Issues: [github.com/ooboai/oobo/issues](https://github.com/ooboai/oobo/issues)
+
+---
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Does oobo work offline?">
+    Yes. Oobo works entirely offline by default. It only contacts a server if you configure a `[server]` endpoint.
+  </Accordion>
+
+  <Accordion title="Can multiple developers use oobo on the same repo?">
+    Yes. Each developer has their own local `~/.oobo/` data. The orphan branch (`oobo/anchors/v1`) can be shared via git push/pull.
+    
+    If two developers create anchors for the same commit, the orphan branch will merge their data (JSON files, one per commit).
+  </Accordion>
+
+  <Accordion title="What happens if I delete ~/.oobo/?">
+    All local session data, transcripts, and cached analytics are lost. The orphan branch in git repos remains (it's part of the repo history).
+    
+    To rebuild:
+    ```bash
+    rm -rf ~/.oobo
+    oobo setup
+    oobo scan
+    ```
+  </Accordion>
+
+  <Accordion title="Can I use oobo with monorepos?">
+    Yes. Oobo treats each git repo as a project. Monorepos with multiple services will show all sessions from the root.
+  </Accordion>
+
+  <Accordion title="Does oobo slow down git commands?">
+    No. Read commands (status, log, diff, etc.) pass through to git with zero overhead. Only write commands (commit, push, merge) trigger anchor creation, which adds less than 100ms in most cases.
+  </Accordion>
+
+  <Accordion title="How do I completely uninstall oobo?">
+    ```bash
+    # Remove binary
+    rm ~/.local/bin/oobo
+    
+    # Remove data
+    rm -rf ~/.oobo
+    
+    # Remove alias
+    oobo alias uninstall  # or manually edit shell RC files
+    
+    # Remove orphan branches from repos (optional)
+    cd your-repo
+    git branch -D oobo/anchors/v1
+    git push origin --delete oobo/anchors/v1
+    ```
+  </Accordion>
+</AccordionGroup>

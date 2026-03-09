@@ -1,97 +1,125 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "oobo"
+description: "Git decorator for humans and agents"
 ---
 
-## Setting up
+<div style="text-align: center; padding: 3rem 0;">
+  <h1 style="font-size: 3rem; font-weight: 700; color: #1a1a1a; margin-bottom: 1rem;">
+    Git for agents (and humans)
+  </h1>
+  <p style="font-size: 1.25rem; color: #545454; max-width: 48rem; margin: 0 auto 2rem;">
+    A transparent git decorator that enriches every commit with AI context: sessions, tokens, and code attribution. Humans use it like normal git. Agents use <code>--agent</code> for structured JSON.
+  </p>
+  <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 2rem;">
+    <a href="/quickstart" style="background: #94cb04; color: #1a1a1a; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 600;">
+      Get Started
+    </a>
+    <a href="https://github.com/ooboai/oobo" style="background: #e6e6e6; color: #1a1a1a; padding: 0.75rem 1.5rem; border-radius: 6px; text-decoration: none; font-weight: 600;">
+      View on GitHub
+    </a>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+## Why oobo?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
+AI coding tools generate conversations, token usage, and context that disappear the moment you close the tab. Meanwhile, `git log` only shows diffs — it has no idea that Claude wrote that function or that you spent 14k tokens debugging a race condition.
+
+**oobo bridges the gap.** It decorates git transparently, and on every write operation (commit, push, merge) it captures the AI sessions that contributed to the change and writes structured metadata called an **anchor**.
+
+No workflow changes. No plugins. No cloud required.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Transparent Git Decorator" icon="git-alt" href="/concepts/anchors">
+    Use oobo as a drop-in replacement for git with zero workflow changes
+  </Card>
+  <Card title="AI Session Discovery" icon="robot" href="/concepts/sessions">
+    Automatically detects sessions from 10+ AI coding tools
+  </Card>
+  <Card title="Code Attribution" icon="code-branch" href="/concepts/attribution">
+    Track which lines were written by AI vs human
+  </Card>
+  <Card title="Token Tracking" icon="chart-line" href="/commands/stats">
+    Monitor token usage and costs across all AI tools
+  </Card>
+  <Card title="Agent-First Design" icon="brackets-curly" href="/agents/overview">
+    JSON output mode for AI agents with --agent flag
+  </Card>
+  <Card title="Privacy by Default" icon="shield-check" href="/guides/privacy-security">
+    Everything stays local unless you configure an endpoint
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Install oobo">
+    ```bash
+    curl -fsSL https://oobo.ai/install.sh | bash
+    ```
+  </Step>
+  <Step title="Run setup wizard">
+    ```bash
+    oobo setup
+    ```
+  </Step>
+  <Step title="Use it like git">
+    ```bash
+    oobo commit -m "fix auth middleware"
+    oobo push origin main
+    ```
+  </Step>
+</Steps>
+
+## Supported Tools
+
+oobo works with all major AI coding assistants:
+
+- **Cursor** — Full support with lifecycle hooks
+- **Claude Code** — Full support with lifecycle hooks  
+- **OpenCode** — Full support with lifecycle hooks
+- **Gemini CLI** — Full support with lifecycle hooks
+- **Aider** — Session and token tracking
+- **GitHub Copilot Chat** — Session and token tracking
+- **Windsurf** — Session tracking with partial token data
+- **Codex CLI** — Session and token tracking
+- **Zed** — Session and token tracking
+- **Trae** — Session tracking with partial token data
+
+<Card title="View All Supported Tools" icon="list" href="/guides/supported-tools">
+  See detailed compatibility matrix and integration details
 </Card>
 
-## Make it yours
+## How It Works
 
-Design a docs site that looks great and empowers your users.
+```
+You run:  oobo commit -m "fix auth middleware"
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+  1. Execute real `git commit`
+  2. Detect write operation
+  3. Read AI sessions from local tool storage
+  4. Build anchor: commit + sessions + tokens + attribution
+  5. Write anchor to local DB + git orphan branch
+  6. Fire event to endpoint (if configured)
+  7. Return git's exit code unchanged
+```
 
-## Create beautiful pages
+Read operations (`status`, `log`, `diff`) pass straight through to git with zero overhead.
 
-Everything you need to create world-class documentation.
+## Next Steps
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Detailed installation instructions for all platforms
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Core Concepts" icon="book" href="/concepts/anchors">
+    Learn about anchors, sessions, and transparency modes
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Command Reference" icon="terminal" href="/commands/overview">
+    Explore all available commands and flags
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="For AI Agents" icon="robot" href="/agents/overview">
+    Integration guide for AI coding agents
   </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+</CardGroup>

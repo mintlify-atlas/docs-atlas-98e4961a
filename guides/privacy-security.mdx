@@ -1,0 +1,318 @@
+---
+title: Privacy & Security
+description: How oobo protects your data and respects your privacy
+---
+
+Oobo is designed with a **local-first, read-only, no-telemetry** philosophy. This page explains what data oobo accesses, how it's protected, and what security guarantees you can rely on.
+
+## Core principles
+
+1. **Read-only access**: Oobo never writes to AI tool data directories
+2. **Local by default**: All data stays on your machine unless you configure a server endpoint
+3. **Secret redaction**: Sessions are scrubbed with [gitleaks](https://github.com/gitleaks/gitleaks) patterns before any sharing
+4. **No telemetry**: Oobo does not phone home or collect usage data
+5. **Config protection**: API keys in config files are automatically protected with restrictive permissions
+
+---
+
+## Read-only access
+
+Oobo reads session data from AI tool storage but **never writes** to it.
+
+### What oobo reads
+
+<AccordionGroup>
+  <Accordion title="Cursor">
+    - `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (macOS)
+    - `~/.cursor/projects/{slug}/composer/{session-id}.jsonl`
+    - VSCode workspace storage directories
+    
+    **Read-only**: Yes. No modifications.
+  </Accordion>
+
+  <Accordion title="Claude Code">
+    - `~/.claude/projects/{slug}/{session-id}.jsonl`
+    
+    **Read-only**: Yes. No modifications.
+  </Accordion>
+
+  <Accordion title="Gemini CLI">
+    - `~/.gemini/tmp/{slug}/chats/session-*.json`
+    - `~/.gemini/projects.json`
+    
+    **Read-only**: Yes. No modifications.
+  </Accordion>
+
+  <Accordion title="OpenCode">
+    - OpenCode's SQLite database
+    
+    **Read-only**: Yes. Opened with `SQLITE_OPEN_READONLY` flag.
+  </Accordion>
+
+  <Accordion title="Aider">
+    - `.aider.chat.history.md` (project root)
+    - `~/.oobo/aider-analytics.jsonl` (if configured)
+    
+    **Read-only**: Yes. No modifications to `.aider.chat.history.md`. The analytics log is written **by Aider**, not oobo (oobo only reads it).
+  </Accordion>
+
+  <Accordion title="Copilot, Windsurf, Zed, Trae, Codex">
+    - Extension storage, conversation files, local databases (tool-specific paths)
+    
+    **Read-only**: Yes. No modifications.
+  </Accordion>
+</AccordionGroup>
+
+Oobo opens all databases with read-only flags. It **never** writes to AI tool directories.
+
+---
+
+## Local-first by default
+
+By default, **all data stays on your machine**. Nothing leaves your computer unless you explicitly configure a server endpoint.
+
+### Where data is stored
+
+- **Anchors**: Local SQLite database at `~/.oobo/db.sqlite`
+- **Transcripts**: Original tool directories + cached redacted copies in `~/.oobo/`
+- **Orphan branch**: `oobo/anchors/v1` branch in your git repo (metadata only by default)
+
+### When data leaves your machine
+
+Data is sent to a remote server **only if**:
+
+1. You configure a `[server]` endpoint in `~/.oobo/config.toml`:
+   ```toml
+   [server]
+   url = "https://your-server.example.com"
+   api_key = "sk_..."
+   ```
+
+2. You enable telemetry:
+   ```toml
+   [telemetry]
+   enabled = true
+   ```
+
+3. You push a git repo with the `oobo/anchors/v1` orphan branch to a remote
+
+<Note>
+Oobo itself **does not phone home**. The `[telemetry]` section controls whether anchor events are sent to **your configured server**, not to oobo.ai or any third party.
+</Note>
+
+---
+
+## Secret redaction
+
+Before any session transcript is written to the orphan branch, shared, or sent to a server, oobo scrubs it using **[gitleaks](https://github.com/gitleaks/gitleaks)** patterns.
+
+### What's redacted
+
+- API keys (AWS, OpenAI, Anthropic, GitHub, etc.)
+- Private keys (RSA, SSH, TLS)
+- Tokens (JWT, OAuth, session tokens)
+- Connection strings (database URLs, etc.)
+- Credit card numbers
+- Other sensitive patterns matched by gitleaks
+
+### How it works
+
+Oobo uses the [gitleaks](https://github.com/gitleaks/gitleaks) library to scan all session content. Any detected secrets are replaced with `[REDACTED]`.
+
+Example:
+
+```json
+// Before redaction
+{"message": "Use API key sk_live_abc123def456"}
+
+// After redaction
+{"message": "Use API key [REDACTED]"}
+```
+
+<Warning>
+Redaction is not foolproof. Always review transcripts before enabling transparency mode or sharing sessions.
+</Warning>
+
+---
+
+## No telemetry
+
+Oobo **does not collect or send telemetry** to oobo.ai or any third party. There is no analytics, crash reporting, or usage tracking.
+
+### What the `[telemetry]` section controls
+
+The `[telemetry]` config section is **not about oobo phoning home**. It controls what data is sent to **your server endpoint** (if configured):
+
+```toml
+[telemetry]
+enabled = true         # send anchor events to your server
+send_diffs = false     # include git diffs in payloads
+send_transcripts = false  # include redacted transcripts
+```
+
+- `enabled = false`: No data sent to the server, even if a server URL is configured
+- `send_diffs = true`: Include git diffs in anchor payloads (useful for code review)
+- `send_transcripts = true`: Include redacted AI transcripts in payloads
+
+All data is sent **only to the URL you configure**. Oobo never sends data to oobo.ai.
+
+---
+
+## Config file protection
+
+API keys stored in `~/.oobo/config.toml` are automatically protected.
+
+### Automatic `chmod 0600`
+
+On Unix systems (Linux, macOS), oobo sets the config file to `0600` (read/write for owner only) when API keys are present:
+
+```toml
+[server]
+api_key = "sk_prod_abc123"  # triggers chmod 0600
+```
+
+After saving the config:
+
+```bash
+ls -la ~/.oobo/config.toml
+# -rw------- 1 user user 512 Jan 15 10:00 config.toml
+```
+
+This prevents other users on the same machine from reading your API keys.
+
+<Tip>
+**Best practice**: Never commit `~/.oobo/config.toml` to version control. Add it to your global `.gitignore`:
+
+```bash
+echo ".oobo/config.toml" >> ~/.gitignore_global
+```
+</Tip>
+
+---
+
+## Transparency mode implications
+
+Transparency mode controls whether **redacted transcripts** are written to the git orphan branch.
+
+### `mode = "off"` (default)
+
+- Anchor metadata is written to `oobo/anchors/v1` branch
+- Full transcripts stay local in `~/.oobo/`
+- Only commit hash, session IDs, token counts, and attribution are synced
+
+**Who can see this?**
+- Anyone with access to the git repo (after you push)
+- Metadata only — no conversation content
+
+### `mode = "on"`
+
+- Anchor metadata **and redacted transcripts** are written to the orphan branch
+- Full conversation history is included (after secret redaction)
+- Syncs with the repo when you push
+
+**Who can see this?**
+- Anyone with access to the git repo
+- Includes full conversation text (redacted)
+
+<Warning>
+**Transparency mode includes AI transcripts in the git repo.** This is useful for code review and attribution, but ensure your team is aware that conversations will be visible.
+
+All transcripts are redacted using gitleaks before being written.
+</Warning>
+
+### Recommendation
+
+- **Private repos, solo dev**: Use `mode = "off"` unless you need full traceability
+- **Open source**: Use `mode = "off"` to avoid leaking internal discussions
+- **Team projects with code review**: Use `mode = "on"` if your team wants full AI context in the repo
+
+---
+
+## What oobo does NOT do
+
+- **Does not modify AI tool data**: All tool integrations are read-only
+- **Does not phone home**: No telemetry to oobo.ai or any third party
+- **Does not require a server**: Works entirely offline
+- **Does not log commands**: Oobo does not track which git commands you run
+- **Does not upload code**: Code diffs are only sent to your server if `send_diffs = true`
+
+---
+
+## Security checklist
+
+<Steps>
+  <Step title="Review config file permissions">
+    Check that `~/.oobo/config.toml` is `0600` if it contains API keys:
+    
+    ```bash
+    ls -la ~/.oobo/config.toml
+    ```
+  </Step>
+
+  <Step title="Never commit config.toml">
+    Add to your global `.gitignore`:
+    
+    ```bash
+    echo ".oobo/" >> ~/.gitignore_global
+    ```
+  </Step>
+
+  <Step title="Audit transparency mode">
+    Check your transparency setting:
+    
+    ```bash
+    grep transparency ~/.oobo/config.toml
+    ```
+    
+    If `mode = "on"`, ensure your team knows transcripts are in the repo.
+  </Step>
+
+  <Step title="Review ignored repos">
+    If you have sensitive repos that should never be tracked:
+    
+    ```toml
+    ignored_repos = [
+      "/path/to/sensitive-repo"
+    ]
+    ```
+  </Step>
+
+  <Step title="Test secret redaction">
+    View a redacted transcript:
+    
+    ```bash
+    oobo sessions show <session-id>
+    ```
+    
+    Confirm that API keys and secrets are replaced with `[REDACTED]`.
+  </Step>
+</Steps>
+
+---
+
+## Reporting security issues
+
+If you discover a security vulnerability in oobo, please **do not open a public GitHub issue**.
+
+Instead:
+
+- Email: [security@oobo.ai](mailto:security@oobo.ai)
+- Use [GitHub Security Advisories](https://github.com/ooboai/oobo/security/advisories/new)
+
+See [SECURITY.md](https://github.com/ooboai/oobo/blob/main/SECURITY.md) for the full security policy.
+
+---
+
+## Summary
+
+| Property | Status |
+|----------|--------|
+| Read-only access to AI tools | ✓ |
+| Local-first by default | ✓ |
+| Secret redaction with gitleaks | ✓ |
+| No telemetry to oobo.ai | ✓ |
+| Config file protection (chmod 0600) | ✓ |
+| Transparency mode opt-in | ✓ |
+| Open source (auditable) | ✓ |
+
+Oobo is designed to be **safe by default**. All sensitive features are opt-in.

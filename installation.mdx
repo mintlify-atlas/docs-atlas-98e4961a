@@ -1,0 +1,386 @@
+---
+title: Installation
+description: Install oobo on macOS, Linux, or build from source
+---
+
+## Quick install
+
+The fastest way to install oobo is using the official install script.
+
+<Tabs>
+  <Tab title="Humans">
+    Run the interactive installer:
+
+    ```bash
+    curl -fsSL https://oobo.ai/install.sh | bash
+    ```
+
+    The installer will:
+    - Detect your platform automatically
+    - Download the latest release
+    - Install to `~/.oobo/bin/oobo`
+    - Add the binary to your PATH
+    - Show you next steps
+
+    <Note>
+      You may need to restart your shell or run `source ~/.zshrc` (or your shell's rc file) for the PATH changes to take effect.
+    </Note>
+  </Tab>
+
+  <Tab title="Agents">
+    For silent installation with JSON output:
+
+    ```bash
+    curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+    ```
+
+    Returns structured output:
+
+    ```json
+    {
+      "status": "ok",
+      "version": "v0.1.0",
+      "binary": "/home/user/.oobo/bin/oobo",
+      "platform": "x86_64-unknown-linux-gnu"
+    }
+    ```
+
+    The `--agent` flag suppresses colors and interactive prompts.
+
+    <Tip>
+      Agents that read `~/.agents/skills/oobo/SKILL.md` will find the install command automatically in the frontmatter. The skill file is installed during `oobo setup`.
+    </Tip>
+  </Tab>
+</Tabs>
+
+## Platform support
+
+Oobo supports the following platforms:
+
+| Platform | Architecture | C Library |
+|----------|--------------|----------|
+| **macOS** | Apple Silicon (aarch64) | — |
+| **macOS** | Intel (x86_64) | — |
+| **Linux** | x86_64 | glibc |
+| **Linux** | x86_64 | musl |
+| **Linux** | ARM64 (aarch64) | glibc |
+| **Linux** | ARM64 (aarch64) | musl |
+
+The installer automatically detects:
+- Your operating system
+- CPU architecture
+- C library variant (glibc vs musl for Linux)
+
+<Note>
+  Alpine Linux and other musl-based distributions are fully supported.
+</Note>
+
+## Environment variables
+
+Customize the installation with environment variables:
+
+<ParamField path="OOBO_INSTALL_DIR" type="string" default="~/.oobo/bin">
+  Override the installation directory
+
+  ```bash
+  OOBO_INSTALL_DIR=/usr/local/bin curl -fsSL https://oobo.ai/install.sh | bash
+  ```
+</ParamField>
+
+<ParamField path="OOBO_VERSION" type="string" default="latest">
+  Install a specific version
+
+  ```bash
+  OOBO_VERSION=v0.1.0 curl -fsSL https://oobo.ai/install.sh | bash
+  ```
+</ParamField>
+
+<ParamField path="OOBO_NO_MODIFY_PATH" type="boolean" default="0">
+  Skip automatic PATH modification
+
+  ```bash
+  OOBO_NO_MODIFY_PATH=1 curl -fsSL https://oobo.ai/install.sh | bash
+  ```
+
+  Use this if you prefer to manage your PATH manually.
+</ParamField>
+
+## Manual download
+
+Prefer to download releases manually? Grab a binary from [GitHub Releases](https://github.com/ooboai/oobo/releases).
+
+<Steps>
+  <Step title="Download the archive">
+    Visit the [releases page](https://github.com/ooboai/oobo/releases) and download the archive matching your platform:
+
+    - `oobo-{version}-x86_64-apple-darwin.tar.gz` (macOS Intel)
+    - `oobo-{version}-aarch64-apple-darwin.tar.gz` (macOS Apple Silicon)
+    - `oobo-{version}-x86_64-unknown-linux-gnu.tar.gz` (Linux x86_64 glibc)
+    - `oobo-{version}-x86_64-unknown-linux-musl.tar.gz` (Linux x86_64 musl)
+    - `oobo-{version}-aarch64-unknown-linux-gnu.tar.gz` (Linux ARM64 glibc)
+    - `oobo-{version}-aarch64-unknown-linux-musl.tar.gz` (Linux ARM64 musl)
+  </Step>
+
+  <Step title="Extract the binary">
+    ```bash
+    tar -xzf oobo-*.tar.gz
+    ```
+
+    This extracts the `oobo` binary.
+  </Step>
+
+  <Step title="Move to PATH">
+    ```bash
+    mkdir -p ~/.oobo/bin
+    mv oobo ~/.oobo/bin/
+    chmod +x ~/.oobo/bin/oobo
+    ```
+  </Step>
+
+  <Step title="Add to PATH">
+    Add to your shell's rc file (`~/.zshrc`, `~/.bashrc`, etc.):
+
+    ```bash
+    export PATH="$HOME/.oobo/bin:$PATH"
+    ```
+
+    Then restart your shell or source the file:
+
+    ```bash
+    source ~/.zshrc
+    ```
+  </Step>
+</Steps>
+
+## Build from source
+
+Build oobo from source if you want the latest development version or need to modify the code.
+
+### Prerequisites
+
+- **Rust toolchain** (1.70 or later): [Install Rust](https://rustup.rs/)
+- **Git**: For cloning the repository
+
+### Build steps
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/ooboai/oobo.git
+    cd oobo
+    ```
+  </Step>
+
+  <Step title="Build release binary">
+    ```bash
+    cargo build --release
+    ```
+
+    This compiles oobo with full optimizations. The binary will be at:
+
+    ```
+    target/release/oobo
+    ```
+
+    <Note>
+      The release build uses aggressive optimization settings (`opt-level = "z"`, LTO, and stripping) to minimize binary size. Build time will be longer than debug builds.
+    </Note>
+  </Step>
+
+  <Step title="Install the binary">
+    Copy to a directory in your PATH:
+
+    ```bash
+    mkdir -p ~/.oobo/bin
+    cp target/release/oobo ~/.oobo/bin/
+    ```
+
+    Then add to your shell's rc file:
+
+    ```bash
+    export PATH="$HOME/.oobo/bin:$PATH"
+    ```
+  </Step>
+
+  <Step title="Verify installation">
+    ```bash
+    oobo version
+    ```
+
+    Should output version information.
+  </Step>
+</Steps>
+
+### Development build
+
+For faster iteration during development:
+
+```bash
+cargo build
+./target/debug/oobo version
+```
+
+<Warning>
+  Debug builds are significantly larger and slower. Use release builds for production use.
+</Warning>
+
+## Verify installation
+
+After installation, verify that oobo is working correctly:
+
+<CodeGroup>
+
+```bash Check version
+oobo version
+```
+
+```bash Check git passthrough
+oobo status
+```
+
+```bash Verify PATH
+which oobo
+# Should output: /home/user/.oobo/bin/oobo (or your install directory)
+```
+
+```bash Agent mode test
+oobo version --agent
+# Should output JSON with version info
+```
+
+</CodeGroup>
+
+Expected output from `oobo version`:
+
+```
+oobo 0.1.0 (https://oobo.ai)
+git:  2.43.0
+db:   /home/user/.oobo/oobo.db (not created)
+os:   linux x86_64
+```
+
+<Note>
+  The database won't exist until you run `oobo setup` or make your first commit through oobo.
+</Note>
+
+## Uninstall
+
+To completely remove oobo:
+
+<Steps>
+  <Step title="Remove the binary">
+    ```bash
+    rm ~/.oobo/bin/oobo
+    ```
+  </Step>
+
+  <Step title="Remove data directory (optional)">
+    This deletes all sessions, anchors, and configuration:
+
+    ```bash
+    rm -rf ~/.oobo
+    ```
+
+    <Warning>
+      This is irreversible. Back up any data you want to keep first.
+    </Warning>
+  </Step>
+
+  <Step title="Remove PATH entry">
+    Edit your shell's rc file (`~/.zshrc`, `~/.bashrc`, etc.) and remove:
+
+    ```bash
+    export PATH="$HOME/.oobo/bin:$PATH" # oobo
+    ```
+  </Step>
+
+  <Step title="Remove git alias (if installed)">
+    ```bash
+    oobo alias uninstall
+    ```
+
+    Or manually remove from your shell's rc file:
+
+    ```bash
+    alias git=oobo  # oobo
+    ```
+  </Step>
+
+  <Step title="Remove agent skill (optional)">
+    ```bash
+    rm -rf ~/.agents/skills/oobo
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command not found after installation">
+    The binary is installed, but your shell can't find it. Try:
+
+    1. Restart your terminal
+    2. Source your shell's rc file: `source ~/.zshrc` (or `~/.bashrc`, etc.)
+    3. Check if the directory is in your PATH: `echo $PATH`
+    4. Manually add to PATH if missing:
+       ```bash
+       export PATH="$HOME/.oobo/bin:$PATH"
+       ```
+  </Accordion>
+
+  <Accordion title="Permission denied when running oobo">
+    The binary needs execute permissions:
+
+    ```bash
+    chmod +x ~/.oobo/bin/oobo
+    ```
+  </Accordion>
+
+  <Accordion title="Installer fails with 'Unsupported platform'">
+    Your platform may not be supported yet. Try:
+
+    1. Check the [releases page](https://github.com/ooboai/oobo/releases) for available platforms
+    2. Build from source if you have Rust installed
+    3. Open an issue on GitHub to request support for your platform
+  </Accordion>
+
+  <Accordion title="curl or wget not found">
+    The installer requires either `curl` or `wget`. Install one:
+
+    **Debian/Ubuntu:**
+    ```bash
+    sudo apt-get install curl
+    ```
+
+    **macOS:**
+    ```bash
+    brew install curl
+    ```
+
+    **Alpine:**
+    ```bash
+    apk add curl
+    ```
+  </Accordion>
+
+  <Accordion title="Build from source fails">
+    Ensure you have:
+    - Rust 1.70 or later: `rustc --version`
+    - Updated toolchain: `rustup update`
+
+    If build still fails, check the error message and:
+    - Search [existing issues](https://github.com/ooboai/oobo/issues)
+    - Open a new issue with the full error output
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Run the setup wizard and make your first commit
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure AI tools and endpoints
+  </Card>
+</CardGroup>

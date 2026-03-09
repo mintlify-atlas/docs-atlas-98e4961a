@@ -1,0 +1,581 @@
+---
+title: JSON Output (--agent flag)
+description: Complete reference for structured agent output
+---
+
+Every oobo command supports `--agent` for structured JSON output. This is a global flag that works at any position with any command.
+
+## The --agent Flag
+
+```bash
+oobo <command> --agent    # Forces JSON output on any command
+```
+
+<Note>
+  The `--agent` flag is the recommended way to get JSON output. While some commands also support `--json`, agents should always use `--agent` for consistency.
+</Note>
+
+## Supported Commands
+
+The `--agent` flag works with every command:
+
+```bash
+oobo sessions --agent            # JSON list of sessions
+oobo sessions list --agent       # same (explicit subcommand)
+oobo sessions show <id> --agent  # full conversation as JSON
+oobo sessions search <q> --agent # search results as JSON
+oobo projects --agent            # JSON list of projects
+oobo projects show <n> --agent   # project detail as JSON
+oobo anchors --agent             # enriched commit history as JSON
+oobo stats --agent               # analytics as structured data
+oobo card --agent                # developer card as JSON
+oobo sources --agent             # data source coverage as JSON
+oobo dash --agent                # configuration overview as JSON
+oobo version --agent             # version info as JSON
+oobo inspect --agent             # diagnostics as machine-readable JSON
+oobo share <id> --agent          # shared session as JSON
+oobo scan --agent                # suppresses interactive output
+```
+
+## JSON Response Formats
+
+### Sessions List
+
+```bash
+oobo sessions --agent
+oobo sessions list --agent
+oobo sessions list --all --agent
+oobo sessions list --tool cursor -n 10 --agent
+```
+
+**Response fields:**
+
+```json
+[
+  {
+    "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+    "name": "Fix authentication middleware",
+    "source": "cursor",
+    "mode": "agent",
+    "project_path": "/Users/dev/myapp",
+    "created_at": "2026-03-08T10:30:00Z",
+    "updated_at": "2026-03-08T10:45:00Z",
+    "model": "claude-opus-4",
+    "input_tokens": 12450,
+    "output_tokens": 3200,
+    "duration_secs": 900,
+    "is_estimated": false,
+    "files_touched": 5,
+    "tool_calls": 12
+  }
+]
+```
+
+**Field details:**
+
+- `session_id`: UUID (supports prefix matching)
+- `source`: Tool name (`cursor`, `claude`, `gemini`, `opencode`, etc.)
+- `mode`: `agent` or `chat`
+- `is_estimated`: `true` = tiktoken estimate, `false` = native from tool
+- `files_touched`: Number of files modified in session
+- `tool_calls`: Number of tool invocations (edits, commands, etc.)
+
+### Session Detail
+
+```bash
+oobo sessions show <session_id> --agent
+oobo sessions show abc12def --agent  # Prefix matching
+```
+
+**Response fields (all session list fields plus):**
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+  "name": "Fix authentication middleware",
+  "source": "cursor",
+  "model": "claude-opus-4",
+  "input_tokens": 12450,
+  "output_tokens": 3200,
+  "message_count": 8,
+  "messages": [
+    {
+      "role": "user",
+      "text": "The auth middleware is failing on expired tokens",
+      "timestamp_ms": 1709892600000
+    },
+    {
+      "role": "assistant",
+      "text": "I'll help you fix the token expiration handling...",
+      "timestamp_ms": 1709892605000
+    }
+  ]
+}
+```
+
+### Session Search
+
+```bash
+oobo sessions search "auth bug" --agent
+oobo sessions search "middleware" --all --agent -n 20
+```
+
+**Response fields (session list fields plus):**
+
+```json
+[
+  {
+    "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+    "name": "Fix authentication middleware",
+    "source": "cursor",
+    "matched_on": "name",
+    "input_tokens": 12450,
+    "output_tokens": 3200
+  },
+  {
+    "session_id": "7f8e9d6c-5b4a-3c2d-1e0f-9a8b7c6d5e4f",
+    "name": "Refactor user controller",
+    "source": "opencode",
+    "matched_on": "first_message",
+    "input_tokens": 8900,
+    "output_tokens": 2100
+  }
+]
+```
+
+**`matched_on` values:**
+
+- `name`: Match in session title
+- `first_message`: Match in first user message
+- `transcript`: Match in conversation body
+
+### Anchors (Enriched Commits)
+
+```bash
+oobo anchors --agent
+oobo anchors -n 20 --agent
+oobo a --agent  # Short alias
+```
+
+**Response fields:**
+
+```json
+[
+  {
+    "commit_hash": "a1b2c3d4e5f6",
+    "message": "fix auth middleware",
+    "author": "dev@example.com",
+    "author_type": "human",
+    "branch": "main",
+    "committed_at": "2026-03-08T10:45:00Z",
+    "contributors": [
+      {
+        "name": "Cursor",
+        "role": "agent",
+        "model": "claude-opus-4"
+      }
+    ],
+    "files_changed": 3,
+    "lines_added": 45,
+    "lines_deleted": 12,
+    "file_changes": [
+      {
+        "path": "src/auth.rs",
+        "lines_added": 30,
+        "lines_deleted": 8,
+        "attribution": "ai",
+        "agent": "cursor"
+      },
+      {
+        "path": "tests/auth_test.rs",
+        "lines_added": 15,
+        "lines_deleted": 4,
+        "attribution": "ai",
+        "agent": "cursor"
+      }
+    ],
+    "ai_lines_added": 45,
+    "ai_lines_deleted": 12,
+    "human_lines_added": 0,
+    "human_lines_deleted": 0,
+    "ai_percentage": 100,
+    "sessions": [
+      {
+        "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+        "agent": "cursor",
+        "model": "claude-opus-4",
+        "link_type": "hook",
+        "input_tokens": 12450,
+        "output_tokens": 3200,
+        "files_touched": ["src/auth.rs", "tests/auth_test.rs"]
+      }
+    ],
+    "summary": "Fixed token expiration handling in authentication middleware",
+    "intent": "bugfix"
+  }
+]
+```
+
+**Field details:**
+
+- `author_type`: `human` or `ai`
+- `attribution`: `ai`, `human`, or `mixed` (per file)
+- `link_type`: `hook` (explicit via lifecycle hooks) or `window` (time-window inference)
+- `intent`: Inferred commit type (`bugfix`, `feature`, `refactor`, `test`, `docs`)
+
+### Stats
+
+```bash
+oobo stats --agent
+oobo stats --project myapp --agent
+oobo stats --tool cursor --agent
+oobo stats --since 30d --agent
+```
+
+**Response fields:**
+
+```json
+{
+  "sessions": 42,
+  "input_tokens": 125000,
+  "output_tokens": 38000,
+  "total_tokens": 163000,
+  "per_tool": [
+    {
+      "tool": "cursor",
+      "sessions": 25,
+      "input_tokens": 80000,
+      "output_tokens": 24000
+    },
+    {
+      "tool": "opencode",
+      "sessions": 17,
+      "input_tokens": 45000,
+      "output_tokens": 14000
+    }
+  ],
+  "per_model": [
+    {
+      "model": "claude-opus-4",
+      "sessions": 30,
+      "input_tokens": 95000,
+      "output_tokens": 28000
+    },
+    {
+      "model": "claude-sonnet-4",
+      "sessions": 12,
+      "input_tokens": 30000,
+      "output_tokens": 10000
+    }
+  ],
+  "ai_code": {
+    "lines_added": 1250,
+    "lines_deleted": 320,
+    "percentage": 75
+  },
+  "productivity": {
+    "commits_per_session": 1.8,
+    "lines_per_session": 42.5,
+    "tokens_per_line": 3.8
+  },
+  "daily": [
+    {
+      "date": "2026-03-08",
+      "sessions": 5,
+      "input_tokens": 15000,
+      "output_tokens": 4500
+    }
+  ]
+}
+```
+
+### Projects
+
+```bash
+oobo projects --agent
+oobo projects list --agent
+```
+
+**Response fields:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "myapp",
+    "path": "/Users/dev/myapp",
+    "tools": ["cursor", "opencode"],
+    "sessions": 25,
+    "input_tokens": 80000,
+    "output_tokens": 24000
+  }
+]
+```
+
+### Project Detail
+
+```bash
+oobo projects show myapp --agent
+oobo projects show /Users/dev/myapp --agent
+```
+
+**Response fields (all project list fields plus):**
+
+```json
+{
+  "id": 1,
+  "name": "myapp",
+  "path": "/Users/dev/myapp",
+  "tools": ["cursor", "opencode"],
+  "sessions": 25,
+  "input_tokens": 80000,
+  "output_tokens": 24000,
+  "recent_sessions": [
+    {
+      "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+      "name": "Fix authentication middleware",
+      "source": "cursor",
+      "created_at": "2026-03-08T10:30:00Z"
+    }
+  ]
+}
+```
+
+### Share (Redacted Session)
+
+```bash
+oobo share <session_id> --agent
+oobo share <session_id> --out session.json
+```
+
+**Response fields:**
+
+```json
+{
+  "session_id": "2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a",
+  "source": "cursor",
+  "model": "claude-opus-4",
+  "messages": [
+    {
+      "role": "user",
+      "text": "The auth middleware is failing on expired tokens [REDACTED]"
+    },
+    {
+      "role": "assistant",
+      "text": "I'll help you fix the token expiration handling..."
+    }
+  ],
+  "stats": {
+    "input_tokens": 12450,
+    "output_tokens": 3200,
+    "duration_secs": 900
+  },
+  "shared_at": "2026-03-08T11:00:00Z",
+  "oobo_version": "0.1.0"
+}
+```
+
+<Warning>
+  Sessions are scrubbed with [gitleaks](https://github.com/gitleaks/gitleaks) patterns before sharing. API keys, tokens, and secrets are replaced with `[REDACTED]`.
+</Warning>
+
+### Version
+
+```bash
+oobo version --agent
+```
+
+**Response fields:**
+
+```json
+{
+  "oobo_version": "0.1.0",
+  "git_version": "2.44.0",
+  "db_path": "/Users/dev/.oobo/db/oobo.db",
+  "os": "macos",
+  "arch": "aarch64"
+}
+```
+
+### Sources
+
+```bash
+oobo sources --agent
+```
+
+**Response fields:**
+
+```json
+{
+  "tools": [
+    {
+      "name": "cursor",
+      "enabled": true,
+      "detected": true,
+      "sessions": 25,
+      "hooks_installed": true
+    },
+    {
+      "name": "claude",
+      "enabled": true,
+      "detected": false,
+      "sessions": 0,
+      "hooks_installed": false
+    }
+  ]
+}
+```
+
+### Diagnostics
+
+```bash
+oobo inspect --agent
+oobo inspect --fix --agent
+```
+
+**Response fields:**
+
+```json
+{
+  "status": "ok",
+  "issues": [],
+  "checks": [
+    {
+      "name": "git_available",
+      "passed": true
+    },
+    {
+      "name": "database_readable",
+      "passed": true
+    },
+    {
+      "name": "hooks_installed",
+      "passed": true,
+      "tools": ["cursor", "opencode"]
+    }
+  ]
+}
+```
+
+## Session ID Prefix Matching
+
+All session commands support prefix matching for UUIDs:
+
+```bash
+# Full UUID
+oobo sessions show 2c97dced-3950-4b8e-9a1e-5f8c7d6e4b3a --agent
+
+# Short prefix (must be unique)
+oobo sessions show 2c97 --agent
+oobo sessions show 2c97dced --agent
+
+# Export with prefix
+oobo sessions export 2c97 --format md --out chat.md
+```
+
+## Parsing Examples
+
+<CodeGroup>
+
+```python Python
+import subprocess
+import json
+
+# Get sessions as JSON
+result = subprocess.run(
+    ["oobo", "sessions", "--agent"],
+    capture_output=True,
+    text=True
+)
+sessions = json.loads(result.stdout)
+
+# Find high-token sessions
+high_token = [
+    s for s in sessions 
+    if s["input_tokens"] + s["output_tokens"] > 10000
+]
+
+print(f"Found {len(high_token)} sessions over 10k tokens")
+```
+
+```javascript JavaScript
+import { execSync } from 'child_process';
+
+// Get anchors as JSON
+const output = execSync('oobo anchors --agent -n 20', { encoding: 'utf-8' });
+const anchors = JSON.parse(output);
+
+// Calculate AI contribution percentage
+const total_ai_lines = anchors.reduce((sum, a) => sum + a.ai_lines_added, 0);
+const total_lines = anchors.reduce((sum, a) => sum + a.lines_added, 0);
+const ai_pct = (total_ai_lines / total_lines * 100).toFixed(1);
+
+console.log(`AI contributed ${ai_pct}% of lines in last 20 commits`);
+```
+
+```bash Bash
+#!/bin/bash
+
+# Get stats and extract token count
+total_tokens=$(oobo stats --agent | jq '.total_tokens')
+
+if [ "$total_tokens" -gt 100000 ]; then
+  echo "Warning: Token usage over 100k"
+fi
+```
+
+```go Go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os/exec"
+)
+
+type Session struct {
+	SessionID    string `json:"session_id"`
+	InputTokens  int    `json:"input_tokens"`
+	OutputTokens int    `json:"output_tokens"`
+}
+
+func main() {
+	cmd := exec.Command("oobo", "sessions", "--agent")
+	out, _ := cmd.Output()
+
+	var sessions []Session
+	json.Unmarshal(out, &sessions)
+
+	total := 0
+	for _, s := range sessions {
+		total += s.InputTokens + s.OutputTokens
+	}
+
+	fmt.Printf("Total tokens: %d\n", total)
+}
+```
+
+</CodeGroup>
+
+## Error Handling
+
+When a command fails, oobo exits with a non-zero code and writes error details to stderr:
+
+```bash
+oobo sessions show invalid-id --agent
+# Exit code: 1
+# Stderr: "Error: Session not found: invalid-id"
+```
+
+Agents should check exit codes and parse stderr for error messages.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/agents/installation">
+    Silent install and verification for agents
+  </Card>
+  <Card title="Lifecycle Hooks" icon="link" href="/agents/lifecycle-hooks">
+    Explicit session linking with lifecycle events
+  </Card>
+</CardGroup>

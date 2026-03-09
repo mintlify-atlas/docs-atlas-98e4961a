@@ -1,0 +1,325 @@
+---
+title: setup
+description: First-time configuration wizard
+---
+
+## Overview
+
+The `setup` command runs an interactive wizard that:
+
+1. **Scans for AI tools** - Detects installed tools (Cursor, Claude, Gemini, etc.)
+2. **Discovers sessions** - Finds existing projects and sessions
+3. **Configures tools** - Enables/disables tools individually
+4. **Sets up remote server** - Optionally configures API endpoint and key
+5. **Installs skill file** - Writes `~/.agents/skills/oobo/SKILL.md` for agent discovery
+6. **Configures git alias** - Optionally installs `alias git=oobo` in your shell
+7. **Installs hooks** - Sets up git hooks and agent lifecycle hooks
+
+```bash
+oobo setup
+```
+
+<Note>
+  Run `oobo setup` after installation or anytime you want to reconfigure oobo.
+</Note>
+
+## What It Detects
+
+### Supported AI Tools
+
+| Tool | Detection | Hooks | Token Source |
+|------|-----------|-------|-------------|
+| Cursor | ✓ | ✓ | Estimated (tiktoken) |
+| Claude Code | ✓ | ✓ | Native telemetry |
+| Gemini CLI | ✓ | ✓ | Native telemetry |
+| OpenCode | ✓ | ✓ | Native telemetry |
+| Codex CLI | ✓ | — | Native telemetry |
+| Aider | ✓ | — | Native telemetry |
+| GitHub Copilot Chat | ✓ | — | Discovery only |
+| Windsurf | ✓ | — | Discovery only |
+| Zed | ✓ | — | Native telemetry |
+| Trae | ✓ | — | Partial |
+
+<Tip>
+  Tools with **Hooks** support real-time session tracking. Others use time-window correlation.
+</Tip>
+
+### What Gets Configured
+
+The setup wizard creates or updates `~/.oobo/config.toml`:
+
+```toml
+[server]
+url = "https://your-endpoint.example.com"
+api_key = "sk_..."
+
+[transparency]
+mode = "off"           # off | on
+
+[cursor]
+enabled = true
+
+[claude]
+enabled = true
+
+[gemini]
+enabled = false
+
+# ... other tools
+```
+
+## Setup Flow
+
+### 1. Tool Detection
+
+Oobo scans for AI tools by looking for:
+
+- **Session directories** - Tool-specific storage locations
+- **Configuration files** - Tool config in home directory
+- **Running processes** - Active tool instances
+
+Example output:
+```
+  scanning for AI tools...
+  found: Cursor (42), Claude (18), Gemini CLI (5)
+  3 project(s), 65 session(s)
+```
+
+### 2. Interactive Configuration
+
+The wizard prompts for:
+
+- **Tool selection** - Enable/disable each detected tool
+- **Remote server** - Optional API endpoint URL
+- **API key** - Authentication for remote server
+- **Transparency mode** - Share transcripts or metadata only
+- **Git alias** - Install `alias git=oobo`
+
+### 3. Installation
+
+Setup installs:
+
+**Skill file** - `~/.agents/skills/oobo/SKILL.md`
+- Tells AI agents how to use oobo
+- Includes install command, JSON schemas, usage examples
+
+**Git alias** (optional):
+```bash
+alias git=oobo
+```
+
+**Git hooks** (for current project):
+- `post-commit` - Captures AI context after commits
+- `pre-push` - Syncs anchors to remote
+
+**Agent lifecycle hooks** (for supported tools):
+- Session start/end tracking
+- Real-time session correlation
+
+Example output:
+```
+  Configuration saved to /Users/dev/.oobo/config.toml
+  Git alias installed (git = oobo)
+  Agent skill installed at ~/.agents/skills/oobo/
+
+  Agent lifecycle hooks installed:
+    cursor
+    claude
+    gemini
+
+  Git hooks installed for this project:
+    post-commit
+    pre-push
+
+  You're all set! Try:
+    oobo sessions   -- view your AI chat sessions
+    oobo scan       -- discover projects and sessions
+    oobo dash       -- interactive dashboard
+```
+
+## Configuration Options
+
+### Server Configuration
+
+If you configure a remote server, oobo can send anchors to a dashboard or analytics service:
+
+```toml
+[server]
+url = "https://oobo.example.com"
+api_key = "sk_your_api_key"
+```
+
+<Warning>
+  API keys are stored with `chmod 0600` permissions for security.
+</Warning>
+
+### Transparency Mode
+
+- **Off** (default) - Only metadata syncs (sessions, tokens, file paths). Transcripts stay local.
+- **On** - Full transcripts included in anchors and events.
+
+```toml
+[transparency]
+mode = "off"           # off | on
+```
+
+<Note>
+  **Privacy by default**: Transcripts never leave your machine unless you set transparency to `on`.
+</Note>
+
+### Tool Configuration
+
+Enable or disable tools individually:
+
+```toml
+[cursor]
+enabled = true
+
+[claude]
+enabled = false
+```
+
+Disabling a tool prevents oobo from reading its sessions.
+
+## Re-running Setup
+
+You can re-run `oobo setup` anytime:
+
+- **Add new tools** - Enable tools you installed after initial setup
+- **Update server** - Change API endpoint or key
+- **Toggle transparency** - Switch between metadata-only and full transcripts
+- **Reinstall hooks** - Fix broken or missing hooks
+
+```bash
+oobo setup
+```
+
+<Tip>
+  Running setup again is **safe** - it preserves existing config and only updates what you change.
+</Tip>
+
+## Manual Configuration
+
+You can also edit `~/.oobo/config.toml` directly:
+
+```bash
+# Edit config
+vim ~/.oobo/config.toml
+
+# Verify changes
+oobo dash
+```
+
+## Skipping Interactive Prompts
+
+For automated/CI environments, use the default config:
+
+```bash
+# Use defaults (no prompts)
+oobo scan
+oobo index
+```
+
+Setup is only needed for:
+- Custom server configuration
+- Enabling/disabling specific tools
+- Installing git alias and hooks
+
+## What Gets Created
+
+### Files
+
+```
+~/.oobo/
+  config.toml              # Main configuration
+  oobo.db                  # SQLite database
+  skills/oobo/SKILL.md     # Agent skill file
+
+~/.agents/skills/oobo/     # Symlink to ~/.oobo/skills/oobo/
+
+.git/hooks/                # Per-project hooks
+  post-commit
+  pre-push
+```
+
+### Hooks
+
+**Git hooks** (per-project):
+- Created in `.git/hooks/` for the current repo
+- `post-commit` captures AI context
+- `pre-push` syncs anchors to remote
+
+**Agent lifecycle hooks** (global, tool-specific):
+- Cursor: `~/.cursor/hooks/`
+- Claude: `~/.config/claude/hooks/`
+- Gemini CLI: `~/.gemini/hooks/`
+- OpenCode: `~/.config/opencode/hooks/`
+
+## Uninstalling
+
+To remove oobo configuration:
+
+```bash
+# Remove git alias
+oobo alias uninstall
+
+# Remove config and database
+rm -rf ~/.oobo
+
+# Remove agent skill symlink
+rm -rf ~/.agents/skills/oobo
+
+# Remove per-project git hooks (run in each project)
+rm .git/hooks/post-commit .git/hooks/pre-push
+```
+
+## Troubleshooting
+
+### No tools detected
+
+If setup doesn't find any tools:
+
+1. **Check tool installation** - Ensure AI tools are installed
+2. **Run the tool once** - Create at least one session
+3. **Check paths** - Tools must be in standard locations
+
+```bash
+# Force a scan
+oobo scan
+```
+
+### Hooks not installed
+
+If git hooks aren't working:
+
+```bash
+# Re-run setup from inside the repo
+cd /path/to/repo
+oobo setup
+```
+
+### Skill file not found
+
+If agents can't find the skill file:
+
+```bash
+# Verify it exists
+ls -la ~/.agents/skills/oobo/SKILL.md
+
+# Print it
+oobo agent
+
+# Re-run setup to recreate
+oobo setup
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scan" icon="magnifying-glass" href="/commands/scan">
+    Discover projects and sessions after setup
+  </Card>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    Start browsing your AI chat sessions
+  </Card>
+</CardGroup>

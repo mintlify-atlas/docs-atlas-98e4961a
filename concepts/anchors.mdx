@@ -1,0 +1,318 @@
+---
+title: Anchors
+description: The enriched commit primitive that captures AI context
+---
+
+An **anchor** is oobo's core primitive — it extends a standard git commit with AI context, session links, and code attribution.
+
+```
+Git:   commit = diff(files)
+Oobo:  anchor = commit + sessions + tokens + attribution
+```
+
+Every time oobo intercepts a write operation (`commit`, `push`, `merge`), it builds an anchor for that commit, capturing which AI sessions contributed, token usage, and per-file attribution.
+
+## What an Anchor Contains
+
+Each anchor records:
+
+<AccordionGroup>
+  <Accordion title="Core Commit Data">
+    <ResponseField name="commit_hash" type="string" required>
+      Full SHA-1 hash of the git commit
+    </ResponseField>
+    <ResponseField name="branch" type="string" required>
+      Branch name where the commit was made
+    </ResponseField>
+    <ResponseField name="author" type="string" required>
+      Git author (always the human who owns the repo)
+    </ResponseField>
+    <ResponseField name="message" type="string" required>
+      Commit message
+    </ResponseField>
+    <ResponseField name="committed_at" type="integer" required>
+      Unix timestamp (seconds)
+    </ResponseField>
+    <ResponseField name="oobo_version" type="string" required>
+      Version of oobo that created the anchor
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Change Statistics">
+    <ResponseField name="files_changed" type="array" required>
+      List of file paths modified in this commit
+    </ResponseField>
+    <ResponseField name="lines_added" type="integer" required>
+      Total lines added across all files
+    </ResponseField>
+    <ResponseField name="lines_deleted" type="integer" required>
+      Total lines deleted across all files
+    </ResponseField>
+    <ResponseField name="file_changes" type="array">
+      Per-file breakdown with attribution (see below)
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="AI Context">
+    <ResponseField name="session_ids" type="array" required>
+      UUIDs of AI sessions linked to this commit
+    </ResponseField>
+    <ResponseField name="author_type" type="enum" required>
+      Who authored the commit and how AI was involved:
+      - `agent`: AI autonomously committed (non-interactive terminal + active session)
+      - `assisted`: Human committed while collaborating with AI (interactive + active session)
+      - `human`: Human committed with no AI involvement
+      - `automated`: CI/CD or script (non-interactive, no AI session)
+    </ResponseField>
+    <ResponseField name="contributors" type="array">
+      All contributors to this commit (humans and AI agents). Each contributor has:
+      - `name`: Contributor identifier
+      - `role`: `human` or `agent`
+      - `model`: AI model used (only for agents)
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Code Attribution">
+    <ResponseField name="ai_lines_added" type="integer">
+      Lines added by AI across all files
+    </ResponseField>
+    <ResponseField name="ai_lines_deleted" type="integer">
+      Lines deleted by AI across all files
+    </ResponseField>
+    <ResponseField name="human_lines_added" type="integer">
+      Lines added by human across all files
+    </ResponseField>
+    <ResponseField name="human_lines_deleted" type="integer">
+      Lines deleted by human across all files
+    </ResponseField>
+    <ResponseField name="ai_percentage" type="number">
+      AI contribution percentage (0.0–100.0)
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Optional Metadata">
+    <ResponseField name="summary" type="string">
+      High-level summary of the change
+    </ResponseField>
+    <ResponseField name="intent" type="string">
+      Why the change was made
+    </ResponseField>
+    <ResponseField name="reasoning" type="string">
+      How the solution was approached
+    </ResponseField>
+  </Accordion>
+</AccordionGroup>
+
+### Per-File Attribution
+
+Each entry in `file_changes` contains:
+
+<ResponseField name="path" type="string" required>
+  File path relative to repo root
+</ResponseField>
+<ResponseField name="lines_added" type="integer" required>
+  Lines added in this file
+</ResponseField>
+<ResponseField name="lines_deleted" type="integer" required>
+  Lines deleted in this file
+</ResponseField>
+<ResponseField name="attribution" type="enum">
+  How the file was authored:
+  - `ai`: AI agent wrote/edited this file (appears in session's `files_touched`)
+  - `human`: Human wrote this file (no AI session touched it)
+  - `mixed`: Both AI and human contributed (AI session active but file not in `files_touched`)
+</ResponseField>
+<ResponseField name="agent" type="string">
+  Which agent touched this file (if attribution is `ai` or `mixed`)
+</ResponseField>
+
+## AuthorType Explained
+
+The `author_type` field distinguishes different commit scenarios:
+
+### Agent
+AI autonomously committed code without human interaction. Detected when:
+- Commit made from non-interactive terminal
+- Active AI session at commit time
+- Used by CLI agents like Codex, Gemini CLI, OpenCode
+
+### Assisted
+Human committed while actively collaborating with AI. Detected when:
+- Commit made from interactive terminal
+- Active AI session at commit time
+- Common with IDE tools like Cursor, Claude Code
+
+### Human
+Human committed with no AI involvement. Detected when:
+- No active AI session during commit
+- All code attribution is human
+
+### Automated
+CI/CD system or script committed. Detected when:
+- Commit made from non-interactive environment
+- No AI session present
+- Typical for GitHub Actions, build bots
+
+<Info>
+oobo determines interactivity by checking if stdin is a TTY. This distinction helps separate autonomous agent commits from human-assisted ones.
+</Info>
+
+## Anchor Lifecycle
+
+### 1. Creation
+Anchors are created automatically on every git write operation:
+
+```bash
+oobo commit -m "fix auth middleware"
+  → executes git commit
+  → detects active AI sessions
+  → builds anchor with attribution
+  → writes to storage
+```
+
+### 2. Storage
+
+Anchors are stored in **two places**:
+
+#### Local SQLite Database
+- Location: `~/.oobo/oobo.db`
+- Stores full anchor JSON plus session links
+- Used for analytics and queries
+- Never leaves your machine unless you configure an endpoint
+
+#### Git Orphan Branch
+- Branch name: `oobo/anchors/v1`
+- Created automatically on first commit
+- Syncs with `git push/pull` like any branch
+- Layout:
+  ```
+  c8/e12fa9b3d4.../
+    metadata.json       # Anchor-level metadata
+    1/metadata.json     # Per-session metadata
+    1/transcript.txt    # (only if transparency mode is On)
+  ```
+
+<Note>
+The orphan branch is always created and synced — anchor metadata travels with the repo. Session transcripts are only added when transparency mode is `on`.
+</Note>
+
+### 3. Sync Across Machines
+
+When you push:
+```bash
+oobo push origin main
+  → pushes main branch
+  → pushes oobo/anchors/v1 branch automatically
+```
+
+When you pull on another machine:
+```bash
+oobo pull origin main
+  → pulls main branch
+  → pulls oobo/anchors/v1 branch
+  → hydrates local SQLite from branch anchors
+```
+
+<Info>
+Anchors sync seamlessly across your machines via git. The orphan branch ensures metadata is always available, even in fresh clones.
+</Info>
+
+### 4. Hydration
+
+Oobo automatically hydrates the local database from the orphan branch:
+- On first use in a new clone
+- When anchors exist on the branch but not in SQLite
+- Skips anchors already present in the database
+
+```bash
+oobo scan  # manually trigger hydration
+```
+
+## Storage Architecture
+
+The orphan branch uses a sharded directory structure for performance:
+
+```
+oobo/anchors/v1
+├── README.md
+├── c8/
+│   └── e12fa9b3d4abcdef.../
+│       ├── metadata.json
+│       ├── 1/
+│       │   ├── metadata.json
+│       │   └── transcript.txt (if transparency=on)
+│       └── 2/
+│           ├── metadata.json
+│           └── transcript.txt (if transparency=on)
+└── a4/
+    └── 7bcd9e1f2a.../
+        └── metadata.json
+```
+
+- Commit hashes are sharded by first 2 characters for scalability
+- Each commit gets a directory: `<prefix>/<rest>/`
+- Session metadata is numbered: `1/`, `2/`, etc.
+- Transcripts are redacted with [gitleaks](https://github.com/gitleaks/gitleaks) patterns before writing
+
+<Warning>
+The orphan branch is managed by oobo using git plumbing commands. Never edit it manually — corruption can break anchor sync.
+</Warning>
+
+## Code Example
+
+Here's what a minimal anchor looks like in JSON:
+
+```json
+{
+  "oobo_version": "0.1.0",
+  "commit_hash": "c8e12fa9b3d4abcdef1234567890abcdef123456",
+  "branch": "main",
+  "author": "Alice <alice@example.com>",
+  "author_type": "assisted",
+  "contributors": [
+    {
+      "name": "Alice",
+      "role": "human",
+      "model": null
+    },
+    {
+      "name": "cursor",
+      "role": "agent",
+      "model": "claude-sonnet-4-20250514"
+    }
+  ],
+  "committed_at": 1700000000,
+  "message": "feat: add widget support",
+  "files_changed": ["src/widget.rs", "src/lib.rs"],
+  "lines_added": 42,
+  "lines_deleted": 5,
+  "file_changes": [
+    {
+      "path": "src/widget.rs",
+      "lines_added": 40,
+      "lines_deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/lib.rs",
+      "lines_added": 2,
+      "lines_deleted": 5,
+      "attribution": "human"
+    }
+  ],
+  "ai_lines_added": 40,
+  "ai_lines_deleted": 0,
+  "human_lines_added": 2,
+  "human_lines_deleted": 5,
+  "ai_percentage": 85.1,
+  "session_ids": ["2c97dced-3950-482e-b101-9eb7d1b18cf5"],
+  "transparency_mode": "off"
+}
+```
+
+## Related Concepts
+
+- [Sessions](/concepts/sessions) — How AI sessions are discovered and linked
+- [Attribution](/concepts/attribution) — How oobo determines AI vs human code
+- [Transparency](/concepts/transparency) — What data goes on the orphan branch

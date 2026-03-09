@@ -1,0 +1,297 @@
+---
+title: projects
+description: Browse and manage all tracked projects
+---
+
+## Overview
+
+The `projects` command lets you browse and manage all projects oobo has discovered. By default it launches an interactive TUI. With `--agent`, it returns structured JSON.
+
+```bash
+oobo projects              # Interactive TUI
+oobo projects --agent      # JSON output
+```
+
+## Subcommands
+
+### projects list
+
+List all tracked projects.
+
+```bash
+oobo projects list
+oobo projects list --agent
+```
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON.
+</ParamField>
+
+<CodeGroup>
+```bash Human (TUI)
+oobo projects list
+```
+
+```bash Agent (JSON)
+oobo projects list --agent
+```
+
+```json Response
+[
+  {
+    "id": "myapp-1234567890",
+    "name": "myapp",
+    "path": "/Users/dev/myapp",
+    "git_remote": "git@github.com:user/myapp.git",
+    "tools": ["cursor", "claude"],
+    "sessions": 42,
+    "input_tokens": 125000,
+    "output_tokens": 84000,
+    "total_tokens": 209000,
+    "duration_secs": 7200
+  }
+]
+```
+</CodeGroup>
+
+### projects show
+
+Show details for a specific project.
+
+```bash
+oobo projects show <name>
+oobo projects show myapp
+oobo projects show myapp --agent
+```
+
+<ParamField path="name" type="string" required>
+  Project name, slug (ID), or absolute path.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON.
+</ParamField>
+
+<CodeGroup>
+```bash Human Output
+oobo projects show myapp
+```
+
+```bash Agent (JSON)
+oobo projects show myapp --agent
+```
+
+```json Response
+{
+  "id": "myapp-1234567890",
+  "name": "myapp",
+  "path": "/Users/dev/myapp",
+  "git_remote": "git@github.com:user/myapp.git",
+  "tools": ["cursor", "claude"],
+  "sessions": [
+    {
+      "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+      "source": "cursor",
+      "name": "fix auth middleware",
+      "mode": "composer",
+      "model": "claude-sonnet-4-20250514",
+      "input_tokens": 12500,
+      "output_tokens": 8400,
+      "duration_secs": 180,
+      "files_touched": ["src/auth.rs"],
+      "tool_calls": 7,
+      "created_at": 1709896200,
+      "updated_at": 1709896380,
+      "message_count": 8
+    }
+  ],
+  "stats": {
+    "session_count": 42,
+    "input_tokens": 125000,
+    "output_tokens": 84000,
+    "total_tokens": 209000,
+    "duration_secs": 7200
+  }
+}
+```
+</CodeGroup>
+
+### projects forget
+
+Remove a project from tracking. This deletes the project from oobo's database and removes its local cache, but does **not** delete the project directory or git repository.
+
+```bash
+oobo projects forget <name>
+oobo projects forget myapp
+```
+
+<ParamField path="name" type="string" required>
+  Project name, slug (ID), or absolute path.
+</ParamField>
+
+<Warning>
+  This removes all session data and analytics for the project. The operation cannot be undone (unless you run `oobo scan` again).
+</Warning>
+
+## Default Behavior
+
+When you run `oobo projects` with no subcommand, it defaults to `projects list` with an interactive TUI:
+
+```bash
+oobo projects              # same as: oobo projects list
+oobo projects --agent      # same as: oobo projects list --agent
+```
+
+## Interactive TUI
+
+The TUI shows:
+
+- **Project name**
+- **Path** - Absolute path to project directory
+- **Tools** - AI tools detected (Cursor, Claude, etc.)
+- **Sessions** - Total session count
+- **Tokens** - Total input + output tokens
+- **Duration** - Total session time
+
+Navigation:
+- **Arrow keys** - Move between projects
+- **Enter** - View project details and sessions
+- **Esc** - Exit
+
+## Output Fields
+
+### Project Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Project slug (unique identifier) |
+| `name` | string | Project name (directory name) |
+| `path` | string | Absolute path to project |
+| `git_remote` | string | Git remote URL (if available) |
+| `tools` | array | List of AI tools detected |
+| `sessions` | number | Total session count |
+| `input_tokens` | number | Total input tokens |
+| `output_tokens` | number | Total output tokens |
+| `total_tokens` | number | Sum of input + output |
+| `duration_secs` | number | Total session duration |
+
+### Session Object (in `projects show`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_id` | string | Full session UUID |
+| `source` | string | Tool name |
+| `name` | string | Session title |
+| `mode` | string | Session mode |
+| `model` | string | AI model used |
+| `input_tokens` | number | Input tokens |
+| `output_tokens` | number | Output tokens |
+| `duration_secs` | number | Session duration |
+| `files_touched` | array | Files modified |
+| `tool_calls` | number | Tool/function calls |
+| `created_at` | number | Unix timestamp |
+| `updated_at` | number | Unix timestamp |
+| `message_count` | number | Number of messages |
+
+## Use Cases
+
+### List all projects
+
+```bash
+oobo projects
+```
+
+### Get project details
+
+```bash
+oobo projects show myapp
+```
+
+### Export project list as JSON
+
+```bash
+oobo projects --agent > projects.json
+```
+
+### Find projects by tool
+
+```bash
+oobo projects --agent | jq '.[] | select(.tools | contains(["cursor"]))'
+```
+
+### Get top projects by token usage
+
+```bash
+oobo projects --agent | jq 'sort_by(.total_tokens) | reverse | .[0:5]'
+```
+
+### Remove old project
+
+```bash
+oobo projects forget old-project
+```
+
+### See all sessions for a project
+
+```bash
+oobo projects show myapp --agent | jq '.sessions'
+```
+
+## Project Discovery
+
+Projects are discovered during `oobo scan`. Oobo detects:
+
+1. **Git repositories** - Directories with `.git`
+2. **AI tool sessions** - Sessions from Cursor, Claude, Gemini, etc.
+3. **Tool configuration** - Enabled tools in `~/.oobo/config.toml`
+
+To add new projects:
+
+```bash
+oobo scan                  # Scan all tools
+oobo scan --project /path  # Scan specific project
+```
+
+## Project Identification
+
+You can reference projects by:
+
+- **Name** - Directory name (e.g., `myapp`)
+- **Slug (ID)** - Unique identifier (e.g., `myapp-1234567890`)
+- **Path** - Absolute path (e.g., `/Users/dev/myapp`)
+
+All three work with `projects show` and `projects forget`:
+
+```bash
+oobo projects show myapp
+oobo projects show myapp-1234567890
+oobo projects show /Users/dev/myapp
+```
+
+## Plain Text Output
+
+When stdout is not a terminal (e.g., piped or redirected), `projects list` outputs plain text:
+
+```bash
+oobo projects | cat
+```
+
+Output:
+```
+PROJECT                      SESSIONS TOOLS            TOKENS  PATH
+myapp                              42 Cursor, Claude    209k  /Users/dev/myapp
+api-service                        18 Claude            95k  /Users/dev/api
+
+2 project(s)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scan" icon="magnifying-glass" href="/commands/scan">
+    Learn how to discover new projects
+  </Card>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    View sessions within a project
+  </Card>
+</CardGroup>

@@ -1,80 +1,547 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get from zero to your first commit with AI context in minutes
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you start, make sure:
 
-### Step 1: Set up your local environment
+<Tabs>
+  <Tab title="Prerequisites checklist">
+    <Steps>
+      <Step title="Oobo is installed">
+        Verify installation:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+        ```bash
+        oobo version
+        ```
 
-### Step 2: Deploy your changes
+        If not installed, see [Installation](/installation).
+      </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+      <Step title="Git is available">
+        Oobo requires git to function:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+        ```bash
+        git --version
+        ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+        Install git if needed: [git-scm.com](https://git-scm.com/downloads)
+      </Step>
 
-### Step 3: Go live
+      <Step title="You're in a git repository">
+        Oobo works within git repositories. Initialize one if needed:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+        ```bash
+        git init
+        # or
+        git clone <repo-url>
+        ```
+      </Step>
 
-## Next steps
+      <Step title="You have AI tool sessions (optional)">
+        Oobo captures context from AI coding tools like Cursor, Claude Code, Windsurf, etc. If you don't have any sessions yet, oobo will still work but won't have AI context to capture.
 
-Now that you have your docs running, explore these key features:
+        Supported tools: Cursor, Claude Code, Gemini CLI, OpenCode, Aider, GitHub Copilot Chat, Windsurf, Zed, Trae, Codex CLI
+      </Step>
+    </Steps>
+  </Tab>
 
-<CardGroup cols={2}>
+  <Tab title="Quick check">
+    Run these commands to verify:
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    ```bash
+    # Check oobo
+    oobo version
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+    # Check git
+    git --version
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    # Check you're in a repo
+    git status
+    ```
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+    All three should succeed without errors.
+  </Tab>
+</Tabs>
 
-</CardGroup>
+## Setup wizard
+
+Run the interactive setup wizard to configure oobo:
+
+```bash
+oobo setup
+```
+
+The wizard will:
+
+<Steps>
+  <Step title="Scan for AI tools">
+    Oobo automatically detects installed AI coding tools and their sessions:
+
+    ```
+    scanning for AI tools...
+    found: Cursor (42), Claude Code (18), Windsurf (5)
+    3 project(s), 65 session(s)
+    ```
+
+    <Note>
+      If no tools are found, you can still enable tools manually during setup. Oobo will discover sessions when you run `oobo scan` later.
+    </Note>
+  </Step>
+
+  <Step title="Configure tools">
+    Select which tools to track. All detected tools are enabled by default.
+
+    You can:
+    - Enable/disable specific tools
+    - Configure per-tool settings
+    - Add API keys for usage data (Anthropic, OpenAI, etc.)
+  </Step>
+
+  <Step title="Set up transparency mode">
+    Choose whether to send AI context to a remote endpoint:
+
+    - **Off** (default): Everything stays local
+    - **On**: Anchors fire events to configured endpoint
+
+    <Warning>
+      Only enable transparency mode if you control the endpoint or trust the service.
+    </Warning>
+  </Step>
+
+  <Step title="Install git alias (optional)">
+    Optionally install `alias git=oobo` so you can use `git` commands directly:
+
+    ```bash
+    git commit -m "fix auth"  # actually runs oobo commit
+    ```
+
+    This is completely transparent — all git commands continue to work exactly as before.
+  </Step>
+
+  <Step title="Install hooks">
+    Oobo installs:
+
+    - **Agent lifecycle hooks** (for Cursor, Claude Code, Gemini CLI, OpenCode)
+    - **Git hooks** (post-commit, pre-push) for the current project
+
+    These enable automatic session tracking and anchor syncing.
+  </Step>
+</Steps>
+
+When complete, you'll see:
+
+```
+Configuration saved to /home/user/.oobo/config.toml
+Git alias installed (git = oobo)
+Agent skill installed at ~/.agents/skills/oobo/
+
+Agent lifecycle hooks installed:
+  Cursor
+  Claude Code
+  OpenCode
+
+Git hooks installed for this project:
+  post-commit
+  pre-push
+
+You're all set! Try:
+  oobo sessions   -- view your AI chat sessions
+  oobo scan       -- discover projects and sessions
+  oobo dash       -- interactive dashboard
+```
+
+<Tip>
+  The agent skill file at `~/.agents/skills/oobo/SKILL.md` tells AI agents how to use oobo. Agents that scan this directory will discover oobo automatically.
+</Tip>
+
+## Make your first commit
+
+Now use oobo just like git. Every commit automatically captures AI context:
+
+<Steps>
+  <Step title="Stage your changes">
+    ```bash
+    oobo add .
+    # or use git directly if you installed the alias:
+    git add .
+    ```
+
+    This passes through to `git add` unchanged — oobo only intercepts write operations.
+  </Step>
+
+  <Step title="Commit with oobo">
+    ```bash
+    oobo commit -m "fix authentication middleware"
+    ```
+
+    Behind the scenes, oobo:
+    1. Executes the real `git commit`
+    2. Reads AI sessions from local tool storage
+    3. Links sessions that contributed to this change
+    4. Builds an anchor with sessions, tokens, attribution
+    5. Writes anchor to local DB and `oobo/anchors/v1` branch
+    6. Returns git's exit code
+
+    You'll see normal git output:
+
+    ```
+    [main abc1234] fix authentication middleware
+     2 files changed, 15 insertions(+), 8 deletions(-)
+    ```
+  </Step>
+
+  <Step title="Push to remote">
+    ```bash
+    oobo push origin main
+    ```
+
+    This pushes:
+    - Your main branch (normal git push)
+    - The `oobo/anchors/v1` branch (anchor metadata)
+
+    Anchors sync automatically with your repo.
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Read operations like `status`, `log`, and `diff` pass through to git with **zero overhead**. Only write operations (commit, push, merge) trigger anchor capture.
 </Note>
+
+## View your anchors
+
+See the enriched commit history with AI context:
+
+```bash
+oobo anchors
+```
+
+Example output:
+
+```
+◆ abc1234 fix authentication middleware
+  Contributors: You, Claude 3.7 Sonnet
+  Sessions: 1 (14.2k tokens)
+  AI: 45 lines, Human: 12 lines
+
+● def5678 update README
+  Contributors: You
+  No AI sessions linked
+```
+
+<CardGroup cols={2}>
+  <Card title="Purple diamond (◆)" icon="gem">
+    Commits with linked AI sessions
+  </Card>
+  <Card title="Gray circle (●)" icon="circle">
+    Human-only commits (no AI context)
+  </Card>
+</CardGroup>
+
+### JSON output for agents
+
+```bash
+oobo anchors --agent
+```
+
+Returns structured JSON with full anchor metadata:
+
+```json
+[
+  {
+    "commit_hash": "abc1234def5678",
+    "message": "fix authentication middleware",
+    "timestamp": "2026-03-09T10:30:00Z",
+    "sessions": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "source": "cursor",
+        "model": "claude-3-7-sonnet",
+        "tokens_in": 8420,
+        "tokens_out": 5780
+      }
+    ],
+    "contributors": [
+      {"name": "You", "role": "human"},
+      {"name": "Claude 3.7 Sonnet", "role": "agent", "model": "claude-3-7-sonnet"}
+    ],
+    "attribution": {
+      "ai_lines": 45,
+      "human_lines": 12
+    }
+  }
+]
+```
+
+## Browse sessions
+
+Explore your AI chat sessions:
+
+<Tabs>
+  <Tab title="Interactive TUI">
+    ```bash
+    oobo sessions
+    ```
+
+    Opens an interactive terminal UI:
+
+    - Navigate with arrow keys
+    - Press Enter to view full conversation
+    - Press `q` to quit
+
+    Shows:
+    - Session source (Cursor, Claude Code, etc.)
+    - Model used
+    - Token counts (input/output)
+    - Session duration
+    - Title/first message
+  </Tab>
+
+  <Tab title="List all sessions">
+    ```bash
+    oobo sessions --all
+    ```
+
+    Shows sessions across all projects, not just the current one.
+  </Tab>
+
+  <Tab title="Search sessions">
+    ```bash
+    oobo sessions search "authentication"
+    ```
+
+    Searches session titles and transcripts for keywords.
+  </Tab>
+
+  <Tab title="Agent mode (JSON)">
+    ```bash
+    oobo sessions --agent
+    ```
+
+    Returns sessions as JSON:
+
+    ```json
+    [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "source": "cursor",
+        "model": "claude-3-7-sonnet",
+        "created_at": "2026-03-09T10:00:00Z",
+        "tokens_in": 8420,
+        "tokens_out": 5780,
+        "title": "Fix authentication middleware",
+        "project": "myapp"
+      }
+    ]
+    ```
+  </Tab>
+</Tabs>
+
+### Show a specific session
+
+```bash
+oobo sessions show abc12def
+```
+
+You can use a session ID prefix (like a git commit hash). Oobo will match it automatically.
+
+For agents:
+
+```bash
+oobo sessions show abc12def --agent
+```
+
+Returns the full conversation as JSON with all messages.
+
+## Optional: Install git alias
+
+If you didn't install the git alias during setup, you can add it later:
+
+```bash
+oobo alias install
+```
+
+This adds to your shell's rc file:
+
+```bash
+alias git=oobo  # oobo
+```
+
+After this, all `git` commands automatically go through oobo:
+
+<CodeGroup>
+
+```bash With alias
+git commit -m "fix bug"    # actually runs oobo commit
+git push origin main       # actually runs oobo push
+git status                 # passes through to git
+```
+
+```bash Without alias
+oobo commit -m "fix bug"
+oobo push origin main
+oobo status
+```
+
+</CodeGroup>
+
+<Tip>
+  The alias is completely transparent. Git commands work exactly as before — oobo just enriches write operations with AI context.
+</Tip>
+
+### Remove the alias
+
+If you prefer to use `oobo` explicitly:
+
+```bash
+oobo alias uninstall
+```
+
+## View analytics
+
+See token usage and code attribution:
+
+```bash
+oobo stats
+```
+
+Example output:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Token Usage
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Total input:   142.3k tokens
+  Total output:   89.7k tokens
+  Sessions:       65
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Code Attribution
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AI-assisted:    2,340 lines (67%)
+  Human:          1,150 lines (33%)
+  Total commits:  24
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Models
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  claude-3-7-sonnet:    42 sessions
+  gpt-4o:               18 sessions
+  gemini-2.0-flash:      5 sessions
+```
+
+Filter by project or tool:
+
+```bash
+oobo stats --project myapp
+oobo stats --tool cursor
+oobo stats --since 30d
+```
+
+For agents:
+
+```bash
+oobo stats --agent
+```
+
+Returns analytics as structured JSON.
+
+## Discover more projects
+
+Oobo automatically tracks all git projects where you use AI tools:
+
+```bash
+oobo scan
+```
+
+This discovers:
+- All git repositories on your system
+- AI sessions associated with each project
+- Token usage per project
+
+Then view all projects:
+
+```bash
+oobo projects
+```
+
+Opens an interactive TUI to browse projects and their AI activity.
+
+<Note>
+  Oobo indexes projects and sessions in the background. Run `oobo index` to compute token counts and analytics for all sessions.
+</Note>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Customize tool settings, endpoints, and transparency mode
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Complete reference for all oobo commands
+  </Card>
+  <Card title="For AI Agents" icon="robot" href="/agents/overview">
+    Using oobo from autonomous agents with `--agent` flag
+  </Card>
+  <Card title="Privacy & Security" icon="shield-check" href="/guides/privacy-security">
+    Understand how oobo handles your data
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No AI sessions found">
+    If `oobo sessions` shows no results:
+
+    1. Verify AI tools are enabled in config: `oobo dash`
+    2. Check that you've used AI tools in this project
+    3. Run discovery: `oobo scan`
+    4. Check data sources: `oobo sources`
+
+    Oobo reads sessions from local storage directories. If you just installed an AI tool, there may not be any sessions yet.
+  </Accordion>
+
+  <Accordion title="Git commands not intercepted">
+    If oobo isn't capturing commits:
+
+    1. Verify you're using `oobo commit` (not bare `git commit` without the alias)
+    2. Check if alias is installed: `alias | grep git`
+    3. Check git hooks: `ls -la .git/hooks/`
+    4. Re-run setup in the project: `oobo setup`
+  </Accordion>
+
+  <Accordion title="Anchors not showing up">
+    If `oobo anchors` is empty after commits:
+
+    1. Check if the orphan branch exists: `git branch -a | grep oobo/anchors`
+    2. Import anchors: `oobo sync`
+    3. Check diagnostics: `oobo inspect`
+    4. Try auto-repair: `oobo inspect --fix`
+  </Accordion>
+
+  <Accordion title="Sessions not linking to commits">
+    If commits show no linked sessions:
+
+    - Make sure you used an AI tool before committing
+    - Check time window correlation (oobo links sessions from the last 24 hours)
+    - For tools with agent hooks (Cursor, Claude Code, etc.), verify hooks are installed
+    - Check session timestamps: `oobo sessions --agent`
+  </Accordion>
+
+  <Accordion title="Setup wizard fails">
+    If `oobo setup` encounters errors:
+
+    1. Check permissions on `~/.oobo/`: `ls -la ~/.oobo`
+    2. Verify git is working: `git status`
+    3. Run diagnostics: `oobo inspect --fix`
+    4. Check logs in `~/.oobo/logs/` if they exist
+    5. Report issue: [GitHub Issues](https://github.com/ooboai/oobo/issues)
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  For detailed diagnostics, run `oobo inspect` to check for common issues, or `oobo inspect --fix` to auto-repair what can be fixed.
+</Tip>

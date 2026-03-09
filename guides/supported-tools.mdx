@@ -1,0 +1,370 @@
+---
+title: Supported Tools
+description: AI coding tools that oobo can read sessions from
+---
+
+Oobo supports 10 AI coding tools. All integrations are **read-only** — oobo never writes to tool data directories.
+
+## Feature matrix
+
+| Tool | Sessions | Transcripts | Token Stats | Agent Hooks | Category |
+|------|:--------:|:-----------:|:-----------:|:-----------:|----------|
+| [Cursor](#cursor) | ✓ | ✓ | ✓ | ✓ | IDE |
+| [Claude Code](#claude-code) | ✓ | ✓ | ✓ | ✓ | CLI |
+| [Gemini CLI](#gemini-cli) | ✓ | ✓ | ✓ | ✓ | CLI |
+| [OpenCode](#opencode) | ✓ | ✓ | ✓ | ✓ | CLI |
+| [Codex CLI](#codex-cli) | ✓ | ✓ | ✓ | — | CLI |
+| [Aider](#aider) | ✓ | ✓ | ✓ | — | CLI |
+| [Copilot Chat](#github-copilot-chat) | ✓ | ✓ | ✓ | — | IDE |
+| [Windsurf](#windsurf) | ✓ | ✓ | partial | — | IDE |
+| [Zed](#zed) | ✓ | ✓ | ✓ | — | IDE |
+| [Trae](#trae) | ✓ | ✓ | partial | — | IDE |
+
+### Legend
+
+- **Sessions**: Discover chat sessions and link them to commits
+- **Transcripts**: Read full conversation history (messages, code, context)
+- **Token Stats**: Extract input/output tokens, model, cost, duration
+- **Agent Hooks**: Install lifecycle hooks for real-time session tracking (when supported by the tool)
+- **Category**: IDE (editor integration) or CLI (terminal-based)
+
+---
+
+## Cursor
+
+<Icon icon="cursor" /> **Display Name**: Cursor  
+**Config Key**: `cursor`  
+**Category**: IDE  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` (macOS)
+- **Transcripts**: `~/.cursor/projects/{project-slug}/composer/{session-id}.jsonl`
+- **Workspace metadata**: VSCode workspace storage
+
+### What's captured
+
+- Composer sessions (chat + inline edits)
+- Full conversation transcripts (user, assistant, tool calls)
+- Token usage (input, output, cache reads, cache creation)
+- Model used (e.g. `claude-sonnet-4-5`)
+- Files touched during the session
+- Session duration
+
+### Agent hooks
+
+Cursor supports agent lifecycle hooks. Oobo installs hooks that fire when sessions start/end, enabling real-time session linking.
+
+### Limitations
+
+- Requires Cursor's local storage to be present
+- Only tracks Composer sessions (not inline completions)
+
+---
+
+## Claude Code
+
+<Icon icon="anthropic" /> **Display Name**: Claude Code  
+**Config Key**: `claude`  
+**Category**: CLI  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: `~/.claude/projects/{project-slug}/{session-id}.jsonl`
+- **Transcripts**: Same JSONL files
+
+### What's captured
+
+- All chat sessions per project
+- Full conversation transcripts with tool calls
+- Token usage (input, output, cache)
+- Model (e.g. `opus-4.5`, `sonnet-4.5`, `haiku`)
+- Session timestamps (created, updated)
+
+### Agent hooks
+
+Claude Code supports agent hooks for session lifecycle tracking.
+
+### Limitations
+
+None. Full read access to session data.
+
+---
+
+## Gemini CLI
+
+<Icon icon="google" /> **Display Name**: Gemini CLI  
+**Config Key**: `gemini`  
+**Category**: CLI  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: `~/.gemini/tmp/{project-slug}/chats/session-*.json`
+- **Project map**: `~/.gemini/projects.json` (maps absolute paths to slugs)
+
+### What's captured
+
+- Chat sessions per project
+- Full conversation transcripts
+- Token usage (input, output)
+- Model used
+- Session metadata (created, updated)
+
+### Agent hooks
+
+Gemini CLI supports agent hooks.
+
+### Limitations
+
+None. Full read access to session data.
+
+---
+
+## OpenCode
+
+<Icon icon="code" /> **Display Name**: OpenCode  
+**Config Key**: `opencode`  
+**Category**: CLI  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: OpenCode's internal SQLite database
+- **Transcripts**: Stored in database
+
+### What's captured
+
+- All chat sessions
+- Full conversation transcripts
+- Token usage
+- Model and provider info
+- Tool call metadata
+
+### Agent hooks
+
+OpenCode supports agent lifecycle hooks.
+
+### Limitations
+
+None. Full read access via database.
+
+---
+
+## Codex CLI
+
+<Icon icon="terminal" /> **Display Name**: Codex CLI  
+**Config Key**: `codex`  
+**Category**: CLI  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: Codex's local session storage (JSON files)
+- **Transcripts**: Same JSON files
+
+### What's captured
+
+- Chat sessions
+- Full transcripts
+- Token usage (input, output)
+- Model info
+
+### Agent hooks
+
+Not supported.
+
+### Limitations
+
+No agent hooks. Session linking relies on time-window correlation.
+
+---
+
+## Aider
+
+<Icon icon="terminal" /> **Display Name**: Aider  
+**Config Key**: `aider`  
+**Category**: CLI  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: `.aider.chat.history.md` in project root
+- **Analytics**: `~/.oobo/aider-analytics.jsonl` (requires Aider config)
+
+### What's captured
+
+- Chat sessions from markdown history
+- Full conversation transcripts
+- Token usage (requires analytics log setup)
+- Model and cost data (from analytics)
+
+### Agent hooks
+
+Not supported.
+
+### Setup for token stats
+
+Add this to `~/.aider.conf.yml` to enable token tracking:
+
+```yaml
+analytics-log: ~/.oobo/aider-analytics.jsonl
+```
+
+Then run:
+
+```bash
+oobo scan
+```
+
+### Limitations
+
+- Session IDs are generated from file hash (not native UUIDs)
+- Token stats require analytics log configuration
+
+---
+
+## GitHub Copilot Chat
+
+<Icon icon="github" /> **Display Name**: Copilot  
+**Config Key**: `copilot`  
+**Category**: IDE  
+**Platform**: macOS, Linux, Windows (via VSCode)
+
+### Data sources
+
+- **Sessions**: VSCode Copilot extension storage
+- **Transcripts**: Extension workspace data
+
+### What's captured
+
+- Copilot Chat sessions
+- Conversation transcripts
+- Token usage
+- Model info
+
+### Agent hooks
+
+Not supported.
+
+### Limitations
+
+- Requires GitHub Copilot VSCode extension
+- No agent hooks (time-window correlation only)
+
+---
+
+## Windsurf
+
+<Icon icon="wind" /> **Display Name**: Windsurf  
+**Config Key**: `windsurf`  
+**Category**: IDE  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: `~/.codeium/windsurf/cascade/{uuid}.pb` (encrypted protobuf)
+- **Workspace metadata**: Windsurf workspace storage
+
+### What's captured
+
+- Cascade session discovery (session IDs, timestamps, file sizes)
+- Project/workspace associations
+- Partial metadata (no full transcripts due to encryption)
+
+### Agent hooks
+
+Not supported.
+
+### Limitations
+
+- **Encrypted transcripts**: Windsurf uses ChaCha20-Poly1305 encryption for `.pb` files. Oobo can detect sessions but cannot read conversation content.
+- **Partial token stats**: Only file size and metadata available
+
+---
+
+## Zed
+
+<Icon icon="zap" /> **Display Name**: Zed  
+**Config Key**: `zed`  
+**Category**: IDE  
+**Platform**: macOS, Linux
+
+### Data sources
+
+- **Sessions**: Zed's local assistant storage
+- **Transcripts**: JSON conversation files
+
+### What's captured
+
+- Assistant chat sessions
+- Full transcripts
+- Token usage
+- Model info
+
+### Agent hooks
+
+Not supported.
+
+### Limitations
+
+No agent hooks. Time-window correlation only.
+
+---
+
+## Trae
+
+<Icon icon="code" /> **Display Name**: Trae  
+**Config Key**: `trae`  
+**Category**: IDE  
+**Platform**: macOS, Linux, Windows
+
+### Data sources
+
+- **Sessions**: Trae's local storage
+- **Transcripts**: JSON conversation files
+
+### What's captured
+
+- Chat sessions
+- Full transcripts
+- Partial token stats (depends on Trae version)
+
+### Agent hooks
+
+Not supported.
+
+### Limitations
+
+- Partial token stats (not all versions export full usage)
+- No agent hooks
+
+---
+
+## Configuration
+
+Each tool can be toggled in `~/.oobo/config.toml`:
+
+```toml
+[cursor]
+enabled = true
+
+[claude]
+enabled = false  # disable Claude Code
+
+[gemini]
+enabled = true
+api_key = ""  # optional: for cloud usage API
+```
+
+See [Configuration](/guides/configuration) for details.
+
+## Read-only guarantee
+
+<Note>
+**All integrations are read-only.** Oobo never writes to AI tool data directories. It only reads session metadata and transcripts to build anchors.
+</Note>
+
+See [Privacy & Security](/guides/privacy-security) for the full security policy.

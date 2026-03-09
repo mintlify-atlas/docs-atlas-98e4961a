@@ -1,0 +1,328 @@
+---
+title: Attribution
+description: How oobo determines AI vs human code contributions
+---
+
+Oobo tracks **code attribution** at both file and aggregate levels, distinguishing AI-written code from human-written code in every commit.
+
+## How Attribution Works
+
+Oobo uses a two-tier attribution system:
+
+### 1. Real-Time File-Level Attribution (Preferred)
+
+When a commit has an associated **anchor** with session links:
+
+1. Check if each changed file appears in the session's `files_touched` list
+2. Assign attribution based on match:
+   - **AI**: File appears in `files_touched` → agent wrote/edited this file
+   - **Human**: No active session touched the file → human wrote it
+   - **Mixed**: Session active but file not in `files_touched` → both contributed
+
+```rust
+pub enum FileAttribution {
+    /// AI agent wrote/edited this file (file appears in tool's files_touched).
+    Ai,
+    /// Human wrote this file (no AI session touched it).
+    Human,
+    /// Both AI and human contributed (AI session active but file not in files_touched).
+    Mixed,
+}
+```
+
+**Example:**
+
+Commit changes 3 files: `src/main.rs`, `src/lib.rs`, `README.md`
+
+Session link reports: `files_touched: ["src/main.rs", "src/lib.rs"]`
+
+Attribution:
+- `src/main.rs` → `ai` (in files_touched)
+- `src/lib.rs` → `ai` (in files_touched)
+- `README.md` → `human` (not in files_touched)
+
+<Info>
+Real-time attribution is **accurate** — it uses data captured at commit time from active AI sessions.
+</Info>
+
+### 2. Time-Window Correlation (Fallback)
+
+If no anchor exists for a commit, oobo falls back to correlation:
+
+1. Find sessions active during commit timestamp ± buffer (5 minutes)
+2. Match session `project_path` to commit repo
+3. If match found:
+   - All lines attributed to AI (100% AI)
+   - Source: `correlation:<tool>`
+4. If no match:
+   - All lines attributed to human (0% AI)
+   - Source: `correlation:human`
+
+<Warning>
+Correlation is **less accurate** — it's based on timing, not actual session activity. Use anchors for precise attribution.
+</Warning>
+
+## Per-File Attribution Data
+
+Each anchor contains a `file_changes` array with per-file stats:
+
+```json
+{
+  "path": "src/widget.rs",
+  "lines_added": 40,
+  "lines_deleted": 2,
+  "attribution": "ai",
+  "agent": "cursor"
+}
+```
+
+<ResponseField name="path" type="string" required>
+  File path relative to repo root
+</ResponseField>
+<ResponseField name="lines_added" type="integer" required>
+  Lines added in this file
+</ResponseField>
+<ResponseField name="lines_deleted" type="integer" required>
+  Lines deleted in this file
+</ResponseField>
+<ResponseField name="attribution" type="enum">
+  `ai`, `human`, or `mixed`
+</ResponseField>
+<ResponseField name="agent" type="string">
+  Which agent modified this file (e.g., `cursor`, `claude`)
+</ResponseField>
+
+## Aggregate Attribution
+
+Anchors also compute **aggregate statistics** across all files:
+
+<AccordionGroup>
+  <Accordion title="AI Contribution">
+    <ResponseField name="ai_lines_added" type="integer">
+      Total lines added by AI across all files
+    </ResponseField>
+    <ResponseField name="ai_lines_deleted" type="integer">
+      Total lines deleted by AI across all files
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Human Contribution">
+    <ResponseField name="human_lines_added" type="integer">
+      Total lines added by human across all files
+    </ResponseField>
+    <ResponseField name="human_lines_deleted" type="integer">
+      Total lines deleted by human across all files
+    </ResponseField>
+  </Accordion>
+
+  <Accordion title="Overall Percentage">
+    <ResponseField name="ai_percentage" type="number">
+      AI contribution percentage (0.0–100.0)
+    </ResponseField>
+  </Accordion>
+</AccordionGroup>
+
+### AI Percentage Calculation
+
+The `ai_percentage` field represents the portion of **net change** attributed to AI:
+
+```rust
+let total_added = ai_lines_added + human_lines_added;
+let ai_percentage = if total_added > 0 {
+    100.0 * ai_lines_added as f64 / total_added as f64
+} else {
+    0.0
+};
+```
+
+**Example:**
+
+Commit adds 50 lines total:
+- AI added 40 lines
+- Human added 10 lines
+
+Result: `ai_percentage = (40 / 50) * 100 = 80.0`
+
+<Note>
+Deletions are tracked separately but don't affect the percentage — only additions factor into AI%.
+</Note>
+
+## Attribution Sources
+
+The `source` field in the database indicates how attribution was determined:
+
+| Source | Method | Accuracy |
+|--------|--------|----------|
+| `anchor:<agent>` | Real-time from anchor with session link | High |
+| `anchor:assisted` | Real-time, session active but no agent identified | High |
+| `anchor:human` | Real-time, no session linked | High |
+| `correlation:<tool>` | Time-window match with session | Medium |
+| `correlation:human` | No session match in time window | Medium |
+
+**Examples:**
+
+```json
+{"source": "anchor:cursor"}        // Cursor session explicitly linked
+{"source": "anchor:claude+gemini"}  // Multiple agents contributed
+{"source": "correlation:cursor"}    // Inferred from session timing
+{"source": "correlation:human"}     // No AI session detected
+```
+
+## Viewing Attribution
+
+### Interactive
+
+```bash
+oobo anchors                     # shows AI% for each commit
+oobo stats                       # aggregate attribution across commits
+oobo stats --project myapp       # per-project stats
+oobo stats --since 30d           # time-filtered
+```
+
+### Agent Mode (JSON)
+
+```bash
+oobo anchors --agent             # full anchor data with file_changes
+oobo stats --agent               # structured attribution summary
+```
+
+**Example output:**
+
+```json
+{
+  "total_commits": 42,
+  "total_lines_added": 1523,
+  "ai_lines_added": 1204,
+  "human_lines_added": 319,
+  "ai_percentage": 79.1
+}
+```
+
+## Multi-Agent Attribution
+
+When multiple agents contribute to a single commit:
+
+```json
+{
+  "author_type": "assisted",
+  "contributors": [
+    {
+      "name": "Alice",
+      "role": "human",
+      "model": null
+    },
+    {
+      "name": "cursor",
+      "role": "agent",
+      "model": "claude-sonnet-4-20250514"
+    },
+    {
+      "name": "gemini",
+      "role": "agent",
+      "model": "gemini-2.0-flash-exp"
+    }
+  ],
+  "file_changes": [
+    {"path": "src/api.rs", "attribution": "ai", "agent": "cursor"},
+    {"path": "src/db.rs", "attribution": "ai", "agent": "gemini"},
+    {"path": "README.md", "attribution": "human"}
+  ],
+  "source": "anchor:cursor+gemini"
+}
+```
+
+Per-file `agent` field shows **which specific agent** touched each file.
+
+## Computing Attribution
+
+Oobo runs attribution automatically during:
+
+```bash
+oobo commit    # creates anchor with real-time attribution
+oobo index     # computes attribution for existing commits
+oobo scan      # discovers new commits and attributes them
+```
+
+Manual attribution run:
+
+```bash
+oobo index --force    # recompute attribution for all commits
+```
+
+### Attribution Algorithm
+
+```rust
+fn run_attribution(db: &Db, force: bool) -> Result<(usize, usize), String> {
+    for commit in commits {
+        // Prefer anchor data (real-time, file-level)
+        if let Some(anchor) = db.get_anchor(&commit.hash) {
+            attribute_from_anchor(&anchor);
+            continue;
+        }
+
+        // Fallback: time-window correlation
+        if let Some(session) = find_active_session(&commit) {
+            attribute_to_ai(&commit, &session);
+        } else {
+            attribute_to_human(&commit);
+        }
+    }
+}
+```
+
+See [`src/analytics/attribution.rs`](https://github.com/ooboai/oobo/blob/main/src/analytics/attribution.rs) for implementation.
+
+## Privacy
+
+Attribution data is **privacy-safe**:
+
+- No conversation content included
+- File names only (no file contents)
+- Aggregate line counts and percentages
+- Agent/model identifiers only
+
+This metadata can safely sync via git without exposing proprietary code or discussions.
+
+<Info>
+Even with transparency `off`, attribution data travels with the repo — teammates can see AI vs human stats without reading session transcripts.
+</Info>
+
+## Use Cases
+
+### Developer Insights
+
+```bash
+oobo stats                       # "I wrote 79% AI-assisted code this month"
+oobo card                        # Generate shareable developer card
+```
+
+### Team Analytics
+
+```bash
+oobo stats --project backend     # "Backend repo is 65% AI-assisted"
+oobo stats --tool cursor         # "Cursor contributed 42% of all code"
+```
+
+### Code Review
+
+```bash
+oobo anchors <commit-hash>       # "Which files did the AI write?"
+```
+
+Reviewers can see:
+- Which agent(s) contributed
+- Which files are AI vs human
+- Token usage and session duration
+
+### Productivity Tracking
+
+```bash
+oobo stats --since 7d            # Weekly AI contribution trend
+oobo stats --since 30d --agent   # Export to JSON for dashboards
+```
+
+## Related Concepts
+
+- [Anchors](/concepts/anchors) — Where attribution data is stored
+- [Sessions](/concepts/sessions) — How `files_touched` is determined
+- [Transparency](/concepts/transparency) — Privacy controls for shared repos

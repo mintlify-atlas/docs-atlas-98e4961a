@@ -1,0 +1,182 @@
+---
+title: "Contributor"
+description: "A contributor to a commit - human or AI"
+---
+
+## Overview
+
+The `Contributor` struct represents an individual contributor to a commit, whether human or AI agent. Each anchor maintains a list of contributors to provide clear attribution for collaborative work.
+
+## Contributor Fields
+
+<ResponseField name="name" type="string" required>
+  Name of the contributor.
+  
+  - For humans: Git author name and email (e.g., `"Alice <alice@example.com>"`)
+  - For AI agents: Tool name (e.g., `"cursor"`, `"claude"`, `"windsurf"`)
+</ResponseField>
+
+<ResponseField name="role" type="ContributorRole" required>
+  Whether this contributor is a human or AI agent.
+  
+  See [ContributorRole enum](#contributorrole-enum) for possible values.
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The AI model used (only present for AI agents).
+  
+  Examples: `"claude-sonnet-4-20250514"`, `"gpt-4o"`, `"claude-opus-4"`
+</ResponseField>
+
+## ContributorRole Enum
+
+| Value | Description |
+|-------|-------------|
+| `human` | A human developer |
+| `agent` | An AI agent/tool |
+
+## Example JSON
+
+<CodeGroup>
+```json Human contributor
+{
+  "name": "Alice <alice@example.com>",
+  "role": "human"
+}
+```
+
+```json AI agent contributor
+{
+  "name": "cursor",
+  "role": "agent",
+  "model": "claude-sonnet-4-20250514"
+}
+```
+
+```json Multiple contributors
+[
+  {
+    "name": "Test <test@test.com>",
+    "role": "human",
+    "model": null
+  },
+  {
+    "name": "cursor",
+    "role": "agent",
+    "model": "claude-sonnet-4-20250514"
+  }
+]
+```
+
+```json Agent without model info
+{
+  "name": "aider",
+  "role": "agent"
+}
+```
+</CodeGroup>
+
+<Note>
+  The `model` field is omitted from JSON when null or when the tool doesn't report model information.
+</Note>
+
+## Usage Examples
+
+<Expandable title="Human-only commit">
+  When you commit without any AI involvement, there's a single human contributor:
+  
+  ```json
+  {
+    "author_type": "human",
+    "contributors": [
+      {
+        "name": "Alice <alice@example.com>",
+        "role": "human"
+      }
+    ]
+  }
+  ```
+</Expandable>
+
+<Expandable title="AI-assisted commit">
+  When collaborating with Cursor AI, both you and the AI are listed:
+  
+  ```json
+  {
+    "author_type": "assisted",
+    "contributors": [
+      {
+        "name": "Alice <alice@example.com>",
+        "role": "human"
+      },
+      {
+        "name": "cursor",
+        "role": "agent",
+        "model": "claude-sonnet-4-20250514"
+      }
+    ]
+  }
+  ```
+</Expandable>
+
+<Expandable title="Autonomous agent commit">
+  When an AI agent commits on its own (non-interactive terminal):
+  
+  ```json
+  {
+    "author_type": "agent",
+    "author": "Alice <alice@example.com>",
+    "contributors": [
+      {
+        "name": "cursor",
+        "role": "agent",
+        "model": "claude-sonnet-4-20250514"
+      }
+    ]
+  }
+  ```
+  
+  Note: The git `author` is still the human repo owner, but only the AI is listed as a contributor since the human wasn't actively involved.
+</Expandable>
+
+<Expandable title="Multiple AI agents">
+  When multiple AI tools contribute to the same commit:
+  
+  ```json
+  {
+    "author_type": "assisted",
+    "contributors": [
+      {
+        "name": "Bob <bob@example.com>",
+        "role": "human"
+      },
+      {
+        "name": "cursor",
+        "role": "agent",
+        "model": "claude-sonnet-4-20250514"
+      },
+      {
+        "name": "aider",
+        "role": "agent",
+        "model": "gpt-4o"
+      }
+    ]
+  }
+  ```
+</Expandable>
+
+## Contributor vs Author
+
+<Note>
+  **Key distinction**: The `author` field in an Anchor is always the git author (the human who owns the repo). The `contributors` list provides the full picture of who actually contributed to the changes.
+  
+  - **Human-only commit**: `contributors` has 1 human
+  - **Assisted commit**: `contributors` has 1+ humans and 1+ agents
+  - **Agent commit**: `contributors` has only agents (but `author` is still the human)
+</Note>
+
+## Related Types
+
+- [Anchor](/api/anchor) - The parent commit structure that contains contributors
+- [SessionLink](/api/session) - Session metadata that identifies agents and models
+- [FileChange](/api/file-change) - Per-file attribution that uses contributor data

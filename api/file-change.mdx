@@ -1,0 +1,149 @@
+---
+title: "FileChange"
+description: "Per-file change metadata within a commit"
+---
+
+## Overview
+
+The `FileChange` struct provides detailed attribution for individual files modified in a commit. It tracks how many lines were added/deleted and whether those changes were made by AI, human, or both.
+
+## FileChange Fields
+
+<ResponseField name="path" type="string" required>
+  The file path relative to the repository root.
+</ResponseField>
+
+<ResponseField name="lines_added" type="integer" required>
+  Number of lines added to this file.
+</ResponseField>
+
+<ResponseField name="lines_deleted" type="integer" required>
+  Number of lines deleted from this file.
+</ResponseField>
+
+<ResponseField name="attribution" type="FileAttribution">
+  How this file's changes were authored.
+  
+  See [FileAttribution enum](#fileattribution-enum) for possible values.
+</ResponseField>
+
+<ResponseField name="agent" type="string">
+  Which agent touched this file (if attribution is `ai` or `mixed`).
+  
+  Examples: `"cursor"`, `"claude"`, `"windsurf"`
+</ResponseField>
+
+## FileAttribution Enum
+
+Describes how a file's changes were authored.
+
+| Value | Description |
+|-------|-------------|
+| `ai` | AI agent wrote/edited this file (file appears in tool's `files_touched`) |
+| `human` | Human wrote this file (no AI session touched it) |
+| `mixed` | Both AI and human contributed (AI session active but file not in `files_touched`) |
+
+<Note>
+  The `mixed` attribution occurs when an AI session was active during the commit, but the specific file wasn't explicitly tracked in the session's `files_touched` list. This often happens with:
+  - Manual edits during an AI session
+  - Files the AI suggested changes for but the human implemented
+  - Configuration or metadata files modified by the developer
+</Note>
+
+## Example JSON
+
+<CodeGroup>
+```json AI-authored file
+{
+  "path": "src/main.rs",
+  "lines_added": 10,
+  "lines_deleted": 3,
+  "attribution": "ai",
+  "agent": "cursor"
+}
+```
+
+```json Human-authored file
+{
+  "path": "README.md",
+  "lines_added": 5,
+  "lines_deleted": 0,
+  "attribution": "human"
+}
+```
+
+```json Mixed attribution
+{
+  "path": "Cargo.toml",
+  "lines_added": 2,
+  "lines_deleted": 1,
+  "attribution": "mixed",
+  "agent": "cursor"
+}
+```
+
+```json Without attribution
+{
+  "path": "tests/test.rs",
+  "lines_added": 8,
+  "lines_deleted": 0
+}
+```
+</CodeGroup>
+
+<Note>
+  Optional fields `attribution` and `agent` are omitted from JSON when not available or when no AI session was active.
+</Note>
+
+## Attribution Logic
+
+<Expandable title="How oobo determines attribution">
+  1. **Check for active sessions**: If no AI sessions were linked to the commit, all files are `human`
+  
+  2. **Look at files_touched**: Each session reports which files it modified
+     - If a file appears in `files_touched` → `ai`
+     - If not in `files_touched` but session was active → `mixed`
+     - If no session was active → `human`
+  
+  3. **Multiple sessions**: If multiple AI agents worked on the same commit, oobo uses the most recent session that touched each file
+  
+  4. **Fallback**: When tool doesn't report `files_touched` (e.g., Aider, Claude CLI), attribution may be omitted or use heuristics
+</Expandable>
+
+<Expandable title="Example: Assisted commit workflow">
+  Imagine a commit where Cursor AI made changes to `src/lib.rs` and `src/utils.rs`, but you manually edited `Cargo.toml` while the session was active:
+  
+  ```json
+  [
+    {
+      "path": "src/lib.rs",
+      "lines_added": 15,
+      "lines_deleted": 2,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/utils.rs",
+      "lines_added": 8,
+      "lines_deleted": 0,
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "Cargo.toml",
+      "lines_added": 1,
+      "lines_deleted": 0,
+      "attribution": "mixed",
+      "agent": "cursor"
+    }
+  ]
+  ```
+  
+  The commit's `author_type` would be `assisted` because you collaborated with AI.
+</Expandable>
+
+## Related Types
+
+- [Anchor](/api/anchor) - The parent commit structure that contains file changes
+- [SessionLink](/api/session) - Session metadata that provides `files_touched` data
+- [Contributor](/api/contributor) - High-level contributor attribution

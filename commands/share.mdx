@@ -1,0 +1,349 @@
+---
+title: share
+description: Share a redacted AI session
+---
+
+## Overview
+
+The `share` command exports a session with:
+
+- **Automatic redaction** - Secrets scrubbed using [gitleaks](https://github.com/gitleaks/gitleaks) patterns
+- **Save locally** - Export to file with `--out`
+- **Upload to server** - Send to configured endpoint (if auth is set)
+- **JSON format** - Structured output for agents
+
+```bash
+oobo share <id>                # Preview redacted session
+oobo share <id> --out s.json   # Save to file
+oobo share <id> --agent        # JSON output
+```
+
+## Command Syntax
+
+```bash
+oobo share <session_id> [OPTIONS]
+```
+
+<ParamField path="session_id" type="string" required>
+  Session ID or prefix. Full UUIDs and short prefixes both work.
+</ParamField>
+
+<ParamField path="--out" type="string" optional>
+  Write to file instead of uploading. If omitted and server is configured, uploads to server.
+</ParamField>
+
+<ParamField path="--agent" type="boolean" default="false">
+  Output as JSON.
+</ParamField>
+
+## Examples
+
+### Preview redacted session
+
+```bash
+oobo share abc12def
+```
+
+Output:
+```
+session abc12def redacted and ready (8 messages)
+use --out <file> to save, or configure auth to upload
+```
+
+### Save to file
+
+```bash
+oobo share abc12def --out shared.json
+```
+
+Output:
+```
+shared session abc12def → shared.json
+```
+
+### Upload to server
+
+If server is configured in `~/.oobo/config.toml`:
+
+```bash
+oobo share abc12def
+```
+
+Output:
+```
+shared: https://oobo.dev/s/abc123xyz
+```
+
+### JSON output for agents
+
+<CodeGroup>
+```bash Save to File
+oobo share abc12def --out shared.json --agent
+```
+
+```json Response
+{
+  "status": "saved",
+  "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+  "path": "shared.json",
+  "messages": 8
+}
+```
+</CodeGroup>
+
+<CodeGroup>
+```bash Upload to Server
+oobo share abc12def --agent
+```
+
+```json Response
+{
+  "status": "uploaded",
+  "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+  "url": "https://oobo.dev/s/abc123xyz",
+  "messages": 8
+}
+```
+</CodeGroup>
+
+## Shared Session Format
+
+The exported JSON includes:
+
+```json
+{
+  "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+  "source": "cursor",
+  "model": "claude-sonnet-4-20250514",
+  "messages": [
+    {
+      "role": "user",
+      "text": "The auth middleware is rejecting valid tokens"
+    },
+    {
+      "role": "assistant",
+      "text": "I'll help you debug the auth middleware. Let me check the JWT validation logic..."
+    }
+  ],
+  "stats": {
+    "input_tokens": 12500,
+    "output_tokens": 8400,
+    "duration_secs": 180
+  },
+  "shared_at": "2026-03-08T15:30:00Z",
+  "oobo_version": "0.1.0"
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `session_id` | string | Full session UUID |
+| `source` | string | Tool name (cursor, claude, etc.) |
+| `model` | string | AI model used |
+| `messages` | array | Redacted conversation |
+| `stats` | object | Token counts and duration |
+| `shared_at` | string | ISO 8601 timestamp |
+| `oobo_version` | string | Oobo version that created the share |
+
+### Message Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | string | `user` or `assistant` |
+| `text` | string | Message content (redacted) |
+
+### Stats Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `input_tokens` | number | Input tokens consumed |
+| `output_tokens` | number | Output tokens generated |
+| `duration_secs` | number | Session duration |
+
+## Secret Redaction
+
+Oobo automatically redacts:
+
+- **API keys** - Patterns like `sk_live_...`, `Bearer ...`
+- **Access tokens** - OAuth tokens, JWTs
+- **Passwords** - Common password patterns
+- **Private keys** - SSH keys, PEM files
+- **Database URLs** - Connection strings with credentials
+- **Email addresses** - Personal identifiers
+- **IP addresses** - Private network info
+
+Redaction uses [gitleaks](https://github.com/gitleaks/gitleaks) detection patterns.
+
+### Redaction Example
+
+Original message:
+```
+Use this API key: sk_live_abcdefghijklmnopqrstuvwxyz1234
+```
+
+Redacted message:
+```
+Use this API key: [REDACTED]
+```
+
+<Warning>
+  **Always review** shared sessions before uploading to ensure no sensitive data leaked.
+</Warning>
+
+## Server Upload
+
+### Configuration
+
+To enable upload, configure server and API key:
+
+```bash
+oobo auth login
+```
+
+Or edit `~/.oobo/config.toml`:
+
+```toml
+[server]
+url = "https://oobo.dev"
+api_key = "sk_your_api_key"
+```
+
+### Upload Behavior
+
+When server is configured:
+
+```bash
+oobo share abc12def           # Uploads to server
+oobo share abc12def --out f   # Saves to file (no upload)
+```
+
+When server is **not** configured:
+
+```bash
+oobo share abc12def           # Shows preview (no upload)
+oobo share abc12def --out f   # Saves to file
+```
+
+### Upload Response
+
+```json
+{
+  "status": "ok",
+  "url": "https://oobo.dev/s/abc123xyz",
+  "session_id": "abc12def-3456-7890-abcd-ef1234567890",
+  "expires_at": "2026-04-08T15:30:00Z"
+}
+```
+
+## Use Cases
+
+### Share for code review
+
+```bash
+oobo share abc12def --out review.json
+# Send review.json to teammate
+```
+
+### Debug with support
+
+```bash
+oobo share abc12def
+# Sends redacted session to oobo support
+```
+
+### Export for analysis
+
+```bash
+oobo sessions list --agent | jq -r '.[].session_id' | while read id; do
+  oobo share $id --out "sessions/$id.json"
+done
+```
+
+### Share via URL
+
+```bash
+oobo share abc12def
+# Returns: https://oobo.dev/s/abc123xyz
+# Share URL with collaborators
+```
+
+## Privacy
+
+- **Redaction is automatic** - No manual scrubbing needed
+- **Local by default** - Nothing uploads without server config
+- **No project names** - Shared sessions don't include project path
+- **No file paths** - Absolute paths are stripped
+- **Review before sharing** - Always check redacted output
+
+<Tip>
+  Preview with `oobo share <id>` (no `--out`) to see what will be shared before uploading.
+</Tip>
+
+## Error Handling
+
+### Session not found
+
+```bash
+oobo share nonexistent-id
+```
+
+Error:
+```
+session not found: nonexistent-id
+```
+
+### No transcript
+
+```bash
+oobo share abc12def
+```
+
+Error:
+```
+no transcript found for session abc12def
+```
+
+### Upload failed
+
+```bash
+oobo share abc12def
+```
+
+Error:
+```
+upload failed: connection refused
+```
+
+Fallback: Save locally instead:
+```bash
+oobo share abc12def --out backup.json
+```
+
+## File Output
+
+When using `--out`, the file contains the full shared session JSON:
+
+```bash
+oobo share abc12def --out shared.json
+cat shared.json | jq '.messages | length'
+# → 8
+```
+
+This is useful for:
+- Offline review
+- Version control (commit to repo)
+- Custom processing (jq, scripts)
+- Backup
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sessions" icon="message" href="/commands/sessions">
+    Learn how to find sessions to share
+  </Card>
+  <Card title="Export" icon="download" href="/commands/sessions#sessions-export">
+    Export sessions in other formats
+  </Card>
+</CardGroup>

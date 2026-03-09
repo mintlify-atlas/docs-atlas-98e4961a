@@ -1,0 +1,186 @@
+---
+title: Agent Integration Overview
+description: Why oobo is purpose-built for AI coding agents
+---
+
+Oobo is purpose-built for AI coding agents. Agents commit code constantly, across tools, often in parallel. Without oobo, there is no record of which agent wrote what, how many tokens it took, or which conversation produced a given function.
+
+## Why Agents Need oobo
+
+AI coding agents face unique challenges that oobo was designed to solve:
+
+<CardGroup cols={2}>
+  <Card title="Attribution" icon="fingerprint">
+    Track which agent, model, and session contributed to each commit with granular file-level attribution
+  </Card>
+  <Card title="Multi-Agent Workflows" icon="users">
+    Support parallel sessions across different tools, worktrees, and agents without conflicts
+  </Card>
+  <Card title="Token Tracking" icon="chart-line">
+    Automatic token usage tracking with native tool data or tiktoken estimation
+  </Card>
+  <Card title="Session Replay" icon="clock-rotate-left">
+    Every commit links to the full AI conversation that produced it, enabling audit trails and debugging
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+### Tracking Agent Commits
+
+When agents make commits, oobo automatically enriches them with AI context:
+
+```bash
+# Agent commits normally
+git commit -m "fix auth middleware"
+
+# Oobo enriches the commit with:
+# - Active agent sessions (via lifecycle hooks)
+# - Token counts (input/output)
+# - AI vs human code attribution
+# - Model and tool metadata
+# - Session transcript links
+```
+
+The enriched data is stored in an **anchor** — oobo's core primitive that extends a git commit:
+
+```
+Git:   commit = diff(files)
+Oobo:  anchor = commit + sessions + tokens + attribution
+```
+
+### Multi-Agent Attribution
+
+Multiple agents can work in parallel on the same project. Oobo tracks which agent contributed what:
+
+```json
+{
+  "commit_hash": "a1b2c3d",
+  "contributors": [
+    {"name": "Cursor", "role": "agent", "model": "claude-opus-4"},
+    {"name": "OpenCode", "role": "agent", "model": "claude-sonnet-4"}
+  ],
+  "file_changes": [
+    {
+      "path": "src/auth.rs",
+      "attribution": "ai",
+      "agent": "cursor"
+    },
+    {
+      "path": "src/middleware.rs",
+      "attribution": "ai",
+      "agent": "opencode"
+    }
+  ]
+}
+```
+
+### Session Replay & Audit Trails
+
+Every anchor links to the AI sessions that contributed to the commit. This enables:
+
+- **Debugging**: See the exact conversation that produced a bug
+- **Code review**: Understand the agent's reasoning
+- **Compliance**: Audit trails for regulated environments
+- **Learning**: Study how agents solve problems
+
+```bash
+oobo anchors --agent
+# Returns commits with session IDs
+
+oobo sessions show <session_id> --agent
+# Returns full conversation transcript
+```
+
+## How Agents Should Interact with oobo
+
+Agents interact with oobo in three ways:
+
+<Steps>
+  <Step title="Installation & Detection">
+    Check if oobo is installed and install silently if needed:
+    
+    ```bash
+    # Check if installed
+    command -v oobo
+    
+    # Install with JSON response
+    curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+    # → {"status":"ok","version":"...","binary":"...","platform":"..."}
+    ```
+  </Step>
+  
+  <Step title="Use --agent Flag">
+    Always use `--agent` for structured JSON output:
+    
+    ```bash
+    oobo sessions --agent      # JSON list of sessions
+    oobo anchors --agent       # Enriched commits as JSON
+    oobo stats --agent         # Token analytics as JSON
+    ```
+    
+    See [JSON Output](/agents/json-output) for complete reference.
+  </Step>
+  
+  <Step title="Lifecycle Hooks (Optional)">
+    Tools that support lifecycle hooks (Cursor, Claude Code, Gemini CLI, OpenCode) get explicit session linking:
+    
+    ```bash
+    # Hook fires when agent session starts
+    echo '{"session_id":"...","agent":"cursor"}' | oobo hooks agent session-start
+    
+    # Commit happens → oobo links to active session
+    git commit -m "fix"
+    
+    # Hook fires when session ends
+    echo '{"session_id":"..."}' | oobo hooks agent session-end
+    ```
+    
+    See [Lifecycle Hooks](/agents/lifecycle-hooks) for details.
+  </Step>
+</Steps>
+
+<Note>
+  **Transparency Mode**: Agents should operate with transparency on by default. This syncs anchor metadata and redacted transcripts to the orphan branch, giving teams complete visibility into AI contributions.
+</Note>
+
+## Git Decorator Architecture
+
+Oobo operates as a transparent git decorator:
+
+```
+You run:  oobo commit -m "fix auth middleware"
+
+  1. Execute real `git commit`
+  2. Detect write operation
+  3. Read AI sessions from local tool storage
+  4. Build anchor: commit + sessions + tokens + attribution
+  5. Write anchor to local DB + git orphan branch
+  6. Fire event to endpoint (if configured)
+  7. Return git's exit code unchanged
+```
+
+**Read operations** (`status`, `log`, `diff`) pass straight through to git with zero overhead.
+
+**Write operations** (`commit`, `push`, `merge`) trigger anchor creation.
+
+<Warning>
+  Oobo never writes to AI tool data directories. All tool integrations are read-only.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JSON Output" icon="bracket-curly" href="/agents/json-output">
+    Complete reference for --agent flag and JSON response formats
+  </Card>
+  <Card title="Installation" icon="download" href="/agents/installation">
+    Silent install, verification, and detection from agents
+  </Card>
+  <Card title="Lifecycle Hooks" icon="link" href="/agents/lifecycle-hooks">
+    Explicit session linking for supported tools
+  </Card>
+  <Card title="Skill File" icon="book" href="/agents/skill-file">
+    How agents discover and use the oobo skill file
+  </Card>
+</CardGroup>

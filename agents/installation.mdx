@@ -1,0 +1,424 @@
+---
+title: Agent Installation
+description: Silent install, verification, and detection from AI agents
+---
+
+Agents should install oobo silently with JSON output, verify the installation, and detect if oobo is already installed before attempting installation.
+
+## Silent Install
+
+The install script accepts an `--agent` flag for silent, non-interactive installation:
+
+```bash
+curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+```
+
+### JSON Response Format
+
+On success, the installer outputs a single JSON line:
+
+```json
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "binary": "/usr/local/bin/oobo",
+  "platform": "macos-aarch64"
+}
+```
+
+**Response fields:**
+
+- `status`: `"ok"` on success, `"error"` on failure
+- `version`: Installed oobo version
+- `binary`: Path to oobo executable
+- `platform`: Detected platform (`macos-aarch64`, `linux-x86_64`, etc.)
+
+On failure:
+
+```json
+{
+  "status": "error",
+  "error": "unsupported platform: windows"
+}
+```
+
+### Supported Platforms
+
+- **macOS**: Apple Silicon (aarch64), Intel (x86_64)
+- **Linux**: x86_64, ARM64 (glibc and musl)
+
+<Note>
+  The installer automatically detects the platform and downloads the appropriate binary from [GitHub Releases](https://github.com/ooboai/oobo/releases).
+</Note>
+
+## Detecting Existing Installation
+
+Before installing, check if oobo is already installed:
+
+```bash
+command -v oobo
+```
+
+If oobo is installed, this returns the path to the binary (exit code 0):
+
+```
+/usr/local/bin/oobo
+```
+
+If not installed, it returns nothing (exit code 1).
+
+### Recommended Detection Pattern
+
+<CodeGroup>
+
+```python Python
+import subprocess
+import json
+
+def is_oobo_installed():
+    """Check if oobo is installed."""
+    result = subprocess.run(
+        ["command", "-v", "oobo"],
+        capture_output=True,
+        shell=True
+    )
+    return result.returncode == 0
+
+def install_oobo():
+    """Install oobo silently and return version info."""
+    result = subprocess.run(
+        "curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent",
+        capture_output=True,
+        text=True,
+        shell=True
+    )
+    if result.returncode != 0:
+        raise Exception(f"Installation failed: {result.stderr}")
+    
+    return json.loads(result.stdout)
+
+# Usage
+if not is_oobo_installed():
+    info = install_oobo()
+    print(f"Installed oobo {info['version']} at {info['binary']}")
+else:
+    print("oobo is already installed")
+```
+
+```javascript JavaScript
+import { execSync } from 'child_process';
+
+function isOoboInstalled() {
+  try {
+    execSync('command -v oobo', { encoding: 'utf-8' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function installOobo() {
+  const output = execSync(
+    'curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent',
+    { encoding: 'utf-8' }
+  );
+  return JSON.parse(output);
+}
+
+// Usage
+if (!isOoboInstalled()) {
+  const info = installOobo();
+  console.log(`Installed oobo ${info.version} at ${info.binary}`);
+} else {
+  console.log('oobo is already installed');
+}
+```
+
+```bash Bash
+#!/bin/bash
+
+if ! command -v oobo &>/dev/null; then
+  echo "Installing oobo..."
+  response=$(curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent)
+  
+  if echo "$response" | jq -e '.status == "ok"' &>/dev/null; then
+    version=$(echo "$response" | jq -r '.version')
+    echo "Installed oobo $version"
+  else
+    error=$(echo "$response" | jq -r '.error')
+    echo "Installation failed: $error" >&2
+    exit 1
+  fi
+else
+  echo "oobo is already installed"
+fi
+```
+
+```go Go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os/exec"
+)
+
+type InstallResponse struct {
+	Status   string `json:"status"`
+	Version  string `json:"version,omitempty"`
+	Binary   string `json:"binary,omitempty"`
+	Platform string `json:"platform,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
+func isOoboInstalled() bool {
+	cmd := exec.Command("command", "-v", "oobo")
+	err := cmd.Run()
+	return err == nil
+}
+
+func installOobo() (*InstallResponse, error) {
+	cmd := exec.Command("bash", "-c",
+		"curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var resp InstallResponse
+	err = json.Unmarshal(out, &resp)
+	return &resp, err
+}
+
+func main() {
+	if !isOoboInstalled() {
+		resp, err := installOobo()
+		if err != nil || resp.Status != "ok" {
+			fmt.Printf("Installation failed: %v\n", resp.Error)
+			return
+		}
+		fmt.Printf("Installed oobo %s at %s\n", resp.Version, resp.Binary)
+	} else {
+		fmt.Println("oobo is already installed")
+	}
+}
+```
+
+</CodeGroup>
+
+## Verifying Installation
+
+After installation, verify oobo is working:
+
+```bash
+oobo version --agent
+```
+
+**Expected output:**
+
+```json
+{
+  "oobo_version": "0.1.0",
+  "git_version": "2.44.0",
+  "db_path": "/Users/dev/.oobo/db/oobo.db",
+  "os": "macos",
+  "arch": "aarch64"
+}
+```
+
+If this command succeeds, oobo is installed and functional.
+
+## First-Time Setup
+
+After installation, oobo needs minimal configuration. Agents should write a default config file:
+
+```bash
+mkdir -p ~/.oobo
+cat > ~/.oobo/config.toml << 'EOF'
+[git]
+alias_enabled = true
+
+[transparency]
+mode = "on"
+EOF
+```
+
+**Configuration explained:**
+
+- `git.alias_enabled = true`: Enables the git alias (optional but recommended)
+- `transparency.mode = "on"`: Syncs anchor metadata and redacted transcripts to the orphan branch
+
+<Warning>
+  **Transparency Mode**: Agents should operate with transparency on by default. This gives teams complete visibility into AI contributions.
+</Warning>
+
+### Install Git Alias and Hooks
+
+After writing the config, install the git alias and run initial scan:
+
+```bash
+oobo alias install
+oobo scan
+```
+
+- `oobo alias install`: Adds `alias git=oobo` to shell RC file (optional)
+- `oobo scan`: Discovers existing projects and AI tool sessions
+
+<Note>
+  The `oobo alias install` command modifies `~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish` depending on the active shell. If agents prefer not to modify shell configs, skip this step and use `oobo` directly.
+</Note>
+
+## Checking Configuration
+
+Verify the configuration with diagnostics:
+
+```bash
+oobo inspect --agent
+```
+
+**Example output:**
+
+```json
+{
+  "status": "ok",
+  "issues": [],
+  "checks": [
+    {
+      "name": "git_available",
+      "passed": true
+    },
+    {
+      "name": "database_readable",
+      "passed": true
+    },
+    {
+      "name": "config_valid",
+      "passed": true
+    },
+    {
+      "name": "hooks_installed",
+      "passed": true,
+      "tools": ["cursor", "opencode"]
+    }
+  ]
+}
+```
+
+If `status` is `"ok"` and all checks pass, oobo is ready to use.
+
+### Auto-Fix Issues
+
+If diagnostics report issues, run auto-fix:
+
+```bash
+oobo inspect --fix
+```
+
+This attempts to repair common problems:
+
+- Create missing directories
+- Fix file permissions
+- Reinstall missing hooks
+- Rebuild database indexes
+
+## Skill File Discovery
+
+The install script also writes the oobo skill file to `~/.agents/skills/oobo/SKILL.md`. This file tells agents:
+
+- How to check if oobo is installed (`command -v oobo`)
+- How to install it (`curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent`)
+- Every available command with JSON field descriptions
+- Recommended configuration
+
+Agents that scan `~/.agents/skills/` will automatically discover oobo's capabilities.
+
+See [Skill File](/agents/skill-file) for details.
+
+## Complete Installation Flow
+
+Here's a complete installation flow for agents:
+
+<Steps>
+  <Step title="Check if oobo is installed">
+    ```bash
+    command -v oobo
+    ```
+    
+    If exit code is 0, skip to step 4.
+  </Step>
+  
+  <Step title="Install oobo with --agent flag">
+    ```bash
+    curl -fsSL https://oobo.ai/install.sh | bash -s -- --agent
+    ```
+    
+    Parse JSON response and verify `status: "ok"`.
+  </Step>
+  
+  <Step title="Write default config">
+    ```bash
+    mkdir -p ~/.oobo
+    cat > ~/.oobo/config.toml << 'EOF'
+    [git]
+    alias_enabled = true
+    
+    [transparency]
+    mode = "on"
+    EOF
+    ```
+  </Step>
+  
+  <Step title="Run initial setup">
+    ```bash
+    oobo alias install  # Optional
+    oobo scan
+    ```
+  </Step>
+  
+  <Step title="Verify installation">
+    ```bash
+    oobo inspect --agent
+    ```
+    
+    Check that `status: "ok"`.
+  </Step>
+</Steps>
+
+## Updating oobo
+
+To check for updates:
+
+```bash
+oobo update --check
+```
+
+To install the latest version:
+
+```bash
+oobo update
+```
+
+<Note>
+  The `oobo update` command downloads and installs the latest release from GitHub. It preserves all configuration and data.
+</Note>
+
+## Binary Installation (Alternative)
+
+If the install script is unavailable, download binaries directly from [GitHub Releases](https://github.com/ooboai/oobo/releases):
+
+```bash
+# Example for macOS ARM64
+curl -L https://github.com/ooboai/oobo/releases/latest/download/oobo-macos-aarch64 -o /usr/local/bin/oobo
+chmod +x /usr/local/bin/oobo
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JSON Output" icon="bracket-curly" href="/agents/json-output">
+    Complete reference for --agent flag and response formats
+  </Card>
+  <Card title="Lifecycle Hooks" icon="link" href="/agents/lifecycle-hooks">
+    Set up explicit session linking for supported tools
+  </Card>
+</CardGroup>

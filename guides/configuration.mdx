@@ -1,0 +1,327 @@
+---
+title: Configuration
+description: Configure oobo's behavior, server endpoint, and tool settings
+---
+
+## Config file location
+
+Oobo stores its configuration at `~/.oobo/config.toml`. This file is created automatically when you run `oobo setup` for the first time.
+
+## Configuration structure
+
+The config file is organized into sections:
+
+```toml
+[server]
+url = "https://dashboard.oobo.ai"
+api_key = "sk_..."
+
+[transparency]
+mode = "off"  # or "on"
+
+[git]
+real_git_path = "/usr/bin/git"
+alias_enabled = false
+
+[telemetry]
+enabled = true
+send_diffs = false
+send_transcripts = false
+
+[scan]
+auto_scan = true
+interval_secs = 3600  # 1 hour
+
+[update]
+check_on_startup = true
+check_interval_secs = 86400  # 24 hours
+
+# Per-tool toggles
+[cursor]
+enabled = true
+api_key = ""  # optional, for cloud API usage data
+
+[claude]
+enabled = true
+
+[gemini]
+enabled = true
+
+[opencode]
+enabled = true
+
+[windsurf]
+enabled = true
+
+[aider]
+enabled = true
+
+[copilot]
+enabled = true
+
+[zed]
+enabled = true
+
+[trae]
+enabled = true
+
+[codex]
+enabled = true
+```
+
+## Server configuration
+
+<AccordionGroup>
+  <Accordion title="url">
+    The endpoint where oobo sends anchor events. Defaults to `https://dashboard.oobo.ai`.
+    
+    Set to your own server URL if you're self-hosting.
+  </Accordion>
+
+  <Accordion title="api_key">
+    API key for authenticating with the server endpoint.
+    
+    **Security**: When an API key is present, oobo automatically sets the config file permissions to `0600` (read/write for owner only) on Unix systems.
+  </Accordion>
+</AccordionGroup>
+
+## Transparency mode
+
+```toml
+[transparency]
+mode = "off"  # or "on", "full", "full_transparency"
+```
+
+- **`off`** (default): Anchor metadata is written to the orphan branch, but full transcripts stay local in `~/.oobo/`
+- **`on`** / **`full`**: Full redacted transcripts are included on the orphan branch and sync with the repo
+
+<Warning>
+Transparency mode includes AI conversation transcripts on the git orphan branch. All transcripts are redacted using [gitleaks](https://github.com/gitleaks/gitleaks) patterns before being written.
+</Warning>
+
+See [Privacy & Security](/guides/privacy-security) for implications.
+
+## Git configuration
+
+```toml
+[git]
+real_git_path = "/usr/bin/git"
+alias_enabled = false
+```
+
+- **`real_git_path`**: Path to the actual git binary. Oobo auto-detects this on install using `which -a git` and skips any `oobo` aliases.
+- **`alias_enabled`**: Set to `true` if you've installed the `git=oobo` shell alias. See [Alias Setup](/guides/alias-setup).
+
+## Telemetry configuration
+
+```toml
+[telemetry]
+enabled = true
+send_diffs = false
+send_transcripts = false
+```
+
+<Note>
+Oobo itself **does not phone home**. This section controls what data is sent to your configured `[server]` endpoint, if any.
+</Note>
+
+- **`enabled`**: Whether to send anchor events to the server
+- **`send_diffs`**: Include git diffs in anchor payloads
+- **`send_transcripts`**: Include AI transcripts in anchor payloads (redacted)
+
+## Scan configuration
+
+```toml
+[scan]
+auto_scan = true
+interval_secs = 3600
+```
+
+- **`auto_scan`**: Automatically discover projects and sessions in the background
+- **`interval_secs`**: How often to run scans (default: 3600 = 1 hour)
+
+## Update configuration
+
+```toml
+[update]
+check_on_startup = true
+check_interval_secs = 86400
+```
+
+- **`check_on_startup`**: Check for oobo updates when running commands
+- **`check_interval_secs`**: Minimum interval between update checks (default: 86400 = 24 hours)
+
+## Per-tool configuration
+
+Each supported AI tool has its own section. All tools are enabled by default.
+
+<CodeGroup>
+```toml Toggle a tool
+[cursor]
+enabled = false  # disable Cursor session detection
+```
+
+```toml Add API key for cloud usage
+[cursor]
+enabled = true
+api_key = "cur_..."  # optional: for pulling usage data from Cursor API
+```
+</CodeGroup>
+
+Available tool config keys:
+- `cursor`
+- `claude`
+- `gemini`
+- `opencode`
+- `codex`
+- `windsurf`
+- `aider`
+- `copilot`
+- `zed`
+- `trae`
+
+See [Supported Tools](/guides/supported-tools) for what each tool provides.
+
+## Ignoring repositories
+
+You can exclude specific repositories from oobo tracking:
+
+```toml
+ignored_repos = [
+  "/home/user/projects/sensitive-repo",
+  "/opt/internal-tool"
+]
+```
+
+Ignored repos are stored as absolute paths. Oobo will not create anchors or scan for sessions in these directories.
+
+## Editing the config
+
+### Using the setup wizard
+
+The interactive wizard guides you through initial configuration:
+
+```bash
+oobo setup
+```
+
+This detects installed AI tools, configures the server endpoint, and writes the config file.
+
+### Manual editing
+
+You can edit `~/.oobo/config.toml` directly in any text editor:
+
+```bash
+# Open in your default editor
+$EDITOR ~/.oobo/config.toml
+
+# Or use vim, nano, code, etc.
+vim ~/.oobo/config.toml
+```
+
+Changes take effect immediately — no restart required.
+
+<Tip>
+Run `oobo dash` to see your current configuration in a human-readable format.
+</Tip>
+
+## Configuration examples
+
+<AccordionGroup>
+  <Accordion title="Minimal local-only setup">
+    ```toml
+    # No server, all data stays local
+    [server]
+    url = "https://dashboard.oobo.ai"
+    api_key = ""
+
+    [transparency]
+    mode = "off"
+
+    [telemetry]
+    enabled = false
+
+    [cursor]
+    enabled = true
+
+    [claude]
+    enabled = true
+    ```
+    
+    Everything stays in `~/.oobo/`. Anchors are written to the orphan branch but not sent to a server.
+  </Accordion>
+
+  <Accordion title="Full transparency with server sync">
+    ```toml
+    [server]
+    url = "https://my-oobo-server.example.com"
+    api_key = "sk_prod_abc123"
+
+    [transparency]
+    mode = "on"
+
+    [telemetry]
+    enabled = true
+    send_diffs = false
+    send_transcripts = true
+    ```
+    
+    Redacted transcripts are included on the orphan branch and sent to your server. Diffs are excluded.
+  </Accordion>
+
+  <Accordion title="Only specific tools enabled">
+    ```toml
+    [cursor]
+    enabled = true
+
+    [claude]
+    enabled = true
+
+    [gemini]
+    enabled = false
+
+    [opencode]
+    enabled = false
+
+    [windsurf]
+    enabled = false
+
+    [aider]
+    enabled = false
+
+    [copilot]
+    enabled = false
+
+    [zed]
+    enabled = false
+
+    [trae]
+    enabled = false
+
+    [codex]
+    enabled = false
+    ```
+    
+    Only Cursor and Claude Code sessions will be tracked. All other tools are ignored.
+  </Accordion>
+
+  <Accordion title="Disable auto-scan and updates">
+    ```toml
+    [scan]
+    auto_scan = false
+
+    [update]
+    check_on_startup = false
+    ```
+    
+    Run scans manually with `oobo scan`. Check for updates manually with `oobo update`.
+  </Accordion>
+</AccordionGroup>
+
+## Security
+
+- Config file is stored at `~/.oobo/config.toml` with restrictive permissions when API keys are present
+- On Unix systems, files containing API keys are automatically `chmod 0600` (owner read/write only)
+- Never commit `~/.oobo/config.toml` to version control
+
+See [Privacy & Security](/guides/privacy-security) for full details.
