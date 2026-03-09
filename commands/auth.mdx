@@ -1,0 +1,243 @@
+---
+title: "oobo auth"
+description: "Configure API keys and remote server"
+---
+
+## Overview
+
+The `oobo auth` command manages authentication for remote servers and API keys for AI service providers. API keys enable accurate token counting and cost tracking by fetching usage data directly from provider APIs.
+
+## Usage
+
+```bash
+oobo auth <subcommand> [OPTIONS]
+```
+
+## Subcommands
+
+### login
+
+Log in to oobo.dev (or a self-hosted server).
+
+```bash
+oobo auth login [--key <api-key>]
+```
+
+<ParamField path="--key" type="string">
+  API key (prompted interactively if omitted)
+</ParamField>
+
+### logout
+
+Log out and remove stored credentials.
+
+```bash
+oobo auth logout
+```
+
+### status
+
+Show current authentication status and configured remote server.
+
+```bash
+oobo auth status
+```
+
+Example output:
+
+```
+Authentication Status
+
+Remote Server: https://api.oobo.dev
+Status: ✓ Authenticated
+Account: user@example.com
+
+API Keys:
+  Anthropic: ✓ Configured (sk-ant-admin...5678)
+  OpenAI: ✗ Not configured
+  GitHub Copilot: ✗ Not configured
+  Windsurf: ✗ Not configured
+  Google: ✗ Not configured
+```
+
+### set-remote
+
+Set a custom remote server URL (for self-hosted or enterprise deployments).
+
+```bash
+oobo auth set-remote <url>
+```
+
+<ParamField path="url" type="string" required>
+  Server URL (e.g., `https://oobo.mycompany.com`)
+</ParamField>
+
+### anthropic
+
+Set your Anthropic Admin API key for accurate Claude token and cost data.
+
+```bash
+oobo auth anthropic <key>
+```
+
+<ParamField path="key" type="string" required>
+  Anthropic Admin API key (starts with `sk-ant-admin-`)
+</ParamField>
+
+<Warning>
+This requires an **Admin API key**, not a regular API key. Admin keys have access to your organization's usage data.
+</Warning>
+
+### openai
+
+Set your OpenAI API key for accurate GPT token and cost data.
+
+```bash
+oobo auth openai <key>
+```
+
+<ParamField path="key" type="string" required>
+  OpenAI API key (starts with `sk-`)
+</ParamField>
+
+### copilot
+
+Set your GitHub Copilot organization Personal Access Token.
+
+```bash
+oobo auth copilot <token>
+```
+
+<ParamField path="token" type="string" required>
+  GitHub PAT with `manage_billing:copilot` scope
+</ParamField>
+
+### windsurf
+
+Set your Windsurf/Codeium service key for analytics.
+
+```bash
+oobo auth windsurf <key>
+```
+
+<ParamField path="key" type="string" required>
+  Codeium service key with Analytics Read permission
+</ParamField>
+
+### google
+
+Set your Google AI Studio API key for Gemini usage data.
+
+```bash
+oobo auth google <key>
+```
+
+<ParamField path="key" type="string" required>
+  Google AI Studio API key
+</ParamField>
+
+## Examples
+
+### Configure Anthropic Admin API key
+
+```bash
+oobo auth anthropic sk-ant-admin-xxxxx
+```
+
+After setting this, `oobo stats` will show accurate token counts and costs for Claude usage.
+
+### Check authentication status
+
+```bash
+oobo auth status
+```
+
+### Set up self-hosted server
+
+```bash
+oobo auth set-remote https://oobo.mycompany.com
+oobo auth login --key sk-oobo-xxxxx
+```
+
+### Remove all credentials
+
+```bash
+oobo auth logout
+```
+
+## API Key Security
+
+<Note>
+API keys are stored in `~/.oobo/config.toml` with `chmod 0600` (owner-only read/write). They are never transmitted except to the respective service provider APIs.
+</Note>
+
+### What API keys are used for
+
+- **Anthropic Admin API**: Fetch accurate token counts and costs for Claude usage
+- **OpenAI API**: Fetch usage data for GPT models
+- **GitHub Copilot PAT**: Query organization billing data for Copilot usage
+- **Windsurf/Codeium**: Access analytics for Windsurf sessions
+- **Google AI Studio**: Query Gemini usage data
+
+<Warning>
+API keys are **optional**. Oobo works without them but will use estimated token counts instead of provider-reported data.
+</Warning>
+
+## Self-Hosted / Enterprise
+
+For self-hosted or enterprise deployments:
+
+<Steps>
+  <Step title="Set remote server">
+    ```bash
+    oobo auth set-remote https://oobo.mycompany.com
+    ```
+  </Step>
+  <Step title="Log in with org API key">
+    ```bash
+    oobo auth login --key sk-oobo-xxxxx
+    ```
+  </Step>
+  <Step title="Verify connection">
+    ```bash
+    oobo auth status
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Invalid API key error">
+    Verify the key is correct and has the required permissions. For Anthropic, ensure you're using an **Admin API key** (starts with `sk-ant-admin-`), not a regular API key.
+  </Accordion>
+
+  <Accordion title="Connection refused to remote server">
+    Check the server URL is correct and reachable. Verify your organization's firewall allows connections to the remote server.
+  </Accordion>
+
+  <Accordion title="Token counts still showing as estimated">
+    Run `oobo index --force` after adding API keys to re-compute stats with accurate provider data.
+  </Accordion>
+
+  <Accordion title="Permission denied writing config">
+    Ensure `~/.oobo/config.toml` is writable. Run `chmod 0600 ~/.oobo/config.toml` if needed.
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Setup" icon="gear" href="/commands/setup">
+    Initial configuration wizard
+  </Card>
+  <Card title="Sources" icon="database" href="/commands/sources">
+    Check which tools need API keys
+  </Card>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    View token and cost analytics
+  </Card>
+  <Card title="Configuration" icon="file-code" href="/guides/configuration">
+    Manual config file editing
+  </Card>
+</CardGroup>

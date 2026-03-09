@@ -1,0 +1,178 @@
+---
+title: "oobo version"
+description: "Show oobo version, git version, and environment info"
+---
+
+## Overview
+
+The `oobo version` command displays version information for oobo, the underlying git binary, and environment details. This is useful for troubleshooting and when reporting issues.
+
+## Usage
+
+```bash
+oobo version [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--agent" type="boolean">
+  Output as JSON for machine parsing
+</ParamField>
+
+## Examples
+
+### Show version information
+
+```bash
+oobo version
+```
+
+Example output:
+
+```
+oobo 0.1.0
+git version 2.43.0
+Platform: linux-x86_64
+Install: /home/user/.local/bin/oobo
+Config: /home/user/.oobo/config.toml
+Database: /home/user/.oobo/oobo.db
+```
+
+### JSON output for agents
+
+```bash
+oobo version --agent
+```
+
+Returns:
+
+```json
+{
+  "oobo_version": "0.1.0",
+  "git_version": "2.43.0",
+  "platform": "linux-x86_64",
+  "install_path": "/home/user/.local/bin/oobo",
+  "config_path": "/home/user/.oobo/config.toml",
+  "database_path": "/home/user/.oobo/oobo.db",
+  "rust_version": "1.75.0",
+  "build_date": "2026-03-09"
+}
+```
+
+## Version Information
+
+### oobo version
+
+The currently installed version of oobo. Follows [semantic versioning](https://semver.org/).
+
+### git version
+
+The version of the git binary that oobo uses. Oobo requires git 2.23 or higher.
+
+### Platform
+
+Your operating system and architecture:
+- `darwin-arm64` — macOS Apple Silicon
+- `darwin-x86_64` — macOS Intel
+- `linux-x86_64` — Linux 64-bit (glibc)
+- `linux-x86_64-musl` — Linux 64-bit (musl)
+- `linux-aarch64` — Linux ARM64
+
+### Install path
+
+Where the oobo binary is installed (usually `~/.local/bin/oobo`).
+
+### Config path
+
+Location of the configuration file (`~/.oobo/config.toml`).
+
+### Database path
+
+Location of the SQLite database (`~/.oobo/oobo.db`).
+
+## Use Cases
+
+### Check if update is needed
+
+Compare your version with the [latest release](https://github.com/ooboai/oobo/releases):
+
+```bash
+oobo version
+# oobo 0.1.0
+
+# Check GitHub for latest
+```
+
+Or use `oobo update --check` to automatically check.
+
+### Verify installation
+
+After installing oobo, verify it's accessible:
+
+```bash
+oobo version
+```
+
+If this fails, check your PATH:
+
+```bash
+echo $PATH | grep -o '[^:]*bin'
+```
+
+### Report version in issues
+
+When reporting bugs, include your version info:
+
+```bash
+oobo version --agent | pbcopy  # macOS
+oobo version --agent | xclip   # Linux
+```
+
+### Check git compatibility
+
+Oobo requires git 2.23+. Verify your git version:
+
+```bash
+oobo version | grep git
+```
+
+If your git version is too old, [upgrade git](https://git-scm.com/downloads).
+
+## Comparison with other version commands
+
+<CodeGroup>
+
+```bash oobo version
+# Shows oobo + git + environment
+oobo version
+```
+
+```bash git version
+# Shows only git version
+git version
+```
+
+```bash oobo --version (not supported)
+# Use `oobo version` instead
+oobo version
+```
+
+</CodeGroup>
+
+<Note>
+Unlike many CLI tools, oobo uses `oobo version` (a subcommand) rather than `oobo --version` (a flag). This is because oobo forwards unknown flags to git, and `--version` would show git's version instead.
+</Note>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Update" icon="arrow-up" href="/commands/update">
+    Update to the latest version
+  </Card>
+  <Card title="Inspect" icon="wrench" href="/commands/inspect">
+    Run diagnostics
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Installation guide
+  </Card>
+</CardGroup>

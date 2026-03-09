@@ -1,0 +1,208 @@
+---
+title: "oobo inspect"
+description: "Diagnose and auto-repair common issues"
+---
+
+## Overview
+
+The `oobo inspect` command runs diagnostics to detect common issues and can automatically fix many problems. It checks database integrity, config file syntax, tool data access, orphan branch status, and more.
+
+## Usage
+
+```bash
+oobo inspect [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--fix" type="boolean">
+  Auto-repair issues that can be fixed automatically
+</ParamField>
+
+<ParamField path="--agent" type="boolean">
+  Output as JSON for machine parsing
+</ParamField>
+
+## Examples
+
+### Run diagnostics
+
+```bash
+oobo inspect
+```
+
+Example output:
+
+```
+Running diagnostics...
+
+✓ Database: OK
+✓ Config file: Valid TOML
+✓ Git binary: Found at /usr/bin/git
+✓ Orphan branch: oobo/anchors/v1 exists
+⚠ Cursor sessions: Directory not found
+✗ SQLite lock: Database is locked by another process
+
+Issues found: 2
+- Cursor data directory does not exist (tool may not be installed)
+- Database locked (close other oobo processes)
+
+Run with --fix to auto-repair fixable issues.
+```
+
+### Auto-fix issues
+
+```bash
+oobo inspect --fix
+```
+
+This will automatically repair fixable issues like:
+- Corrupted database indexes
+- Missing orphan branch (recreates it)
+- Invalid config values (resets to defaults)
+- Stale lock files
+- Missing skill file (reinstalls it)
+
+### JSON output
+
+```bash
+oobo inspect --agent
+```
+
+Returns:
+
+```json
+{
+  "status": "issues_found",
+  "checks": [
+    {
+      "name": "database",
+      "status": "ok",
+      "message": "Database integrity check passed"
+    },
+    {
+      "name": "config",
+      "status": "ok",
+      "message": "Config file is valid TOML"
+    },
+    {
+      "name": "cursor_sessions",
+      "status": "warning",
+      "message": "Cursor data directory not found",
+      "fixable": false
+    },
+    {
+      "name": "database_lock",
+      "status": "error",
+      "message": "Database locked by another process",
+      "fixable": true
+    }
+  ],
+  "issues_found": 2,
+  "fixable_issues": 1
+}
+```
+
+## Diagnostic Checks
+
+### Database integrity
+
+Checks SQLite database for:
+- Corrupted indexes
+- Schema mismatches
+- Foreign key violations
+- Lock conflicts
+
+**Auto-fix**: Rebuilds indexes, releases stale locks
+
+### Config file
+
+Validates `~/.oobo/config.toml`:
+- Valid TOML syntax
+- All required fields present
+- Tool names are valid
+- URL formats are correct
+
+**Auto-fix**: Resets invalid values to defaults
+
+### Git binary
+
+Verifies:
+- Git is installed and in PATH
+- Git version is compatible (2.23+)
+- Git can execute without errors
+
+**Auto-fix**: N/A (manual installation required)
+
+### Orphan branch
+
+Checks:
+- `oobo/anchors/v1` branch exists
+- Branch is accessible
+- Recent anchors are present
+
+**Auto-fix**: Recreates orphan branch, re-syncs anchors
+
+### Tool data access
+
+For each enabled tool, checks:
+- Data directory exists
+- Directory is readable
+- Sessions files are present
+
+**Auto-fix**: N/A (tools must be installed manually)
+
+### Skill file
+
+Verifies:
+- Skill file exists at `~/.agents/skills/oobo/SKILL.md`
+- File is readable
+- Frontmatter is valid YAML
+
+**Auto-fix**: Reinstalls skill file
+
+## When to Use Inspect
+
+<Accordion title="After installation">
+  Run `oobo inspect` after installing oobo to verify everything is set up correctly.
+</Accordion>
+
+<Accordion title="Sessions not showing up">
+  If sessions aren't appearing, run `oobo inspect` to check tool data access.
+</Accordion>
+
+<Accordion title="Database errors">
+  If you see database lock or corruption errors, run `oobo inspect --fix`.
+</Accordion>
+
+<Accordion title="After upgrading oobo">
+  Run `oobo inspect --fix` after updating to ensure database schema is up to date.
+</Accordion>
+
+<Accordion title="Before reporting issues">
+  Run `oobo inspect --agent` and include the output when reporting bugs.
+</Accordion>
+
+## Exit Codes
+
+- **0** — All checks passed
+- **1** — Issues found (check output for details)
+- **2** — Critical error (database corrupted, config invalid, etc.)
+
+<Tip>
+Always run `oobo inspect --fix` before reporting issues. Many common problems can be auto-repaired.
+</Tip>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Setup" icon="gear" href="/commands/setup">
+    Initial configuration
+  </Card>
+  <Card title="Sources" icon="database" href="/commands/sources">
+    Check tool data access
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

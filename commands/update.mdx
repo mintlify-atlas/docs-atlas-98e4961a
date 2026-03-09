@@ -1,0 +1,207 @@
+---
+title: "oobo update"
+description: "Check for updates or self-update"
+---
+
+## Overview
+
+The `oobo update` command checks for new versions of oobo and can automatically update to the latest release. It downloads binaries from the official GitHub releases.
+
+## Usage
+
+```bash
+oobo update [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--check" type="boolean">
+  Only check for updates, don't install
+</ParamField>
+
+<ParamField path="--agent" type="boolean">
+  Output as JSON for machine parsing
+</ParamField>
+
+## Examples
+
+### Update to latest version
+
+```bash
+oobo update
+```
+
+Example output:
+
+```
+Checking for updates...
+
+Current version: 0.1.0
+Latest version:  0.2.1
+
+Downloading oobo v0.2.1 for linux-x86_64...
+✓ Downloaded 4.2 MB
+
+Installing...
+✓ Installed to ~/.local/bin/oobo
+
+Successfully updated to v0.2.1
+
+Changelog: https://github.com/ooboai/oobo/releases/tag/v0.2.1
+```
+
+### Check for updates without installing
+
+```bash
+oobo update --check
+```
+
+Example output:
+
+```
+Current version: 0.1.0
+Latest version:  0.2.1
+
+A new version is available!
+
+Run `oobo update` to upgrade.
+```
+
+### JSON output for agents
+
+```bash
+oobo update --check --agent
+```
+
+Returns:
+
+```json
+{
+  "status": "update_available",
+  "current_version": "0.1.0",
+  "latest_version": "0.2.1",
+  "changelog_url": "https://github.com/ooboai/oobo/releases/tag/v0.2.1",
+  "download_url": "https://github.com/ooboai/oobo/releases/download/v0.2.1/oobo-linux-x86_64.tar.gz"
+}
+```
+
+If already up to date:
+
+```json
+{
+  "status": "up_to_date",
+  "current_version": "0.2.1",
+  "latest_version": "0.2.1"
+}
+```
+
+## Update Process
+
+<Steps>
+  <Step title="Version check">
+    Queries GitHub API for the latest release version
+  </Step>
+  <Step title="Platform detection">
+    Determines your OS and architecture (macOS/Linux, x86_64/ARM64)
+  </Step>
+  <Step title="Download">
+    Downloads the appropriate binary from GitHub releases
+  </Step>
+  <Step title="Verification">
+    Verifies the download integrity (checksum if available)
+  </Step>
+  <Step title="Installation">
+    Replaces the current binary at `~/.local/bin/oobo` (or your install location)
+  </Step>
+  <Step title="Database migration">
+    Runs any necessary database schema migrations for the new version
+  </Step>
+</Steps>
+
+## Supported Platforms
+
+- **macOS**: Apple Silicon (arm64), Intel (x86_64)
+- **Linux**: x86_64 (glibc), x86_64 (musl), ARM64 (aarch64)
+
+The updater automatically detects your platform and downloads the correct binary.
+
+## Automatic Update Checks
+
+Oobo checks for updates in the background and shows a notification if a new version is available (at most once per day). This can be disabled in config:
+
+```toml ~/.oobo/config.toml
+[update]
+check_automatically = false
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Permission denied when updating">
+    The install directory may not be writable. Try:
+    ```bash
+    sudo oobo update
+    ```
+    Or reinstall with the install script to fix permissions.
+  </Accordion>
+
+  <Accordion title="Download fails">
+    Check your internet connection and GitHub access. If behind a corporate firewall, you may need to download manually from [GitHub releases](https://github.com/ooboai/oobo/releases).
+  </Accordion>
+
+  <Accordion title="Database migration fails">
+    Run `oobo inspect --fix` after updating. If the issue persists, back up `~/.oobo/` and reinstall.
+  </Accordion>
+
+  <Accordion title="Updated but version still shows old">
+    Your PATH may be pointing to a different oobo binary. Check with:
+    ```bash
+    which oobo
+    ```
+    Ensure it points to `~/.local/bin/oobo` (or your custom install location).
+  </Accordion>
+</AccordionGroup>
+
+## Manual Update
+
+If automatic updates fail, you can manually download and install:
+
+```bash
+# Download latest release
+curl -fsSL https://oobo.ai/install.sh | bash
+
+# Or download specific version
+curl -fsSL https://oobo.ai/install.sh | OOBO_VERSION=0.2.1 bash
+```
+
+## Version Command
+
+To check your current version without updating:
+
+```bash
+oobo version
+```
+
+This shows:
+- oobo version
+- Git version
+- Platform info
+- Install location
+
+<Info>
+Oobo follows [semantic versioning](https://semver.org/). Patch updates (0.1.0 → 0.1.1) are always safe. Minor updates (0.1.0 → 0.2.0) may add new features but maintain backward compatibility. Major updates (0.x → 1.x) may include breaking changes.
+</Info>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Version" icon="tag" href="/commands/version">
+    Check current version
+  </Card>
+  <Card title="Inspect" icon="wrench" href="/commands/inspect">
+    Diagnose issues after updating
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Installation guide
+  </Card>
+</CardGroup>

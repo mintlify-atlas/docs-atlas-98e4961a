@@ -1,0 +1,133 @@
+---
+title: "oobo index"
+description: "Compute token counts and analytics for indexed sessions"
+---
+
+## Overview
+
+The `oobo index` command computes token counts and analytics for sessions discovered by `oobo scan`. It uses tiktoken for accurate token counting and builds the analytics database used by `oobo stats` and `oobo card`.
+
+## Usage
+
+```bash
+oobo index [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--project" type="string">
+  Index only sessions for this project (name, slug, or path)
+</ParamField>
+
+<ParamField path="--force" type="boolean">
+  Re-compute stats even for already indexed sessions
+</ParamField>
+
+<ParamField path="--bg" type="boolean">
+  Run indexing in the background (returns immediately, notifies on completion)
+</ParamField>
+
+<ParamField path="--status" type="boolean">
+  Check the status of a background indexing job
+</ParamField>
+
+<ParamField path="--agent" type="boolean">
+  Output as JSON for machine parsing
+</ParamField>
+
+## Examples
+
+### Index all sessions
+
+```bash
+oobo index
+```
+
+This computes token counts for all sessions that haven't been indexed yet.
+
+### Index a specific project
+
+```bash
+oobo index --project myapp
+```
+
+### Force re-indexing
+
+```bash
+oobo index --force
+```
+
+Re-computes stats even for already indexed sessions. Useful after updating oobo or if you suspect stale data.
+
+### Run in background
+
+```bash
+oobo index --bg
+```
+
+Returns immediately and runs indexing in the background. You'll get a system notification when it completes.
+
+### Check background status
+
+```bash
+oobo index --status
+```
+
+Shows progress of a running background indexing job.
+
+## How Indexing Works
+
+<Steps>
+  <Step title="Token counting">
+    Uses tiktoken-rs to accurately count tokens for each message in a session based on the model used
+  </Step>
+  <Step title="Code attribution">
+    Analyzes which files were touched by AI vs human for code attribution metrics
+  </Step>
+  <Step title="Cost calculation">
+    Computes estimated costs based on model pricing (if API keys are configured)
+  </Step>
+  <Step title="Analytics aggregation">
+    Builds aggregate stats by project, tool, model, and time period
+  </Step>
+</Steps>
+
+## When to Run Index
+
+<Accordion title="After scanning new sessions">
+  Run `oobo index` after `oobo scan` discovers new sessions to make them available in stats.
+</Accordion>
+
+<Accordion title="After adding API keys">
+  Re-index with `--force` after configuring API keys (via `oobo auth`) to fetch accurate token and cost data from provider APIs.
+</Accordion>
+
+<Accordion title="After updating oobo">
+  Re-index with `--force` after updating oobo to benefit from improved token counting or attribution logic.
+</Accordion>
+
+<Accordion title="For large codebases">
+  Use `--bg` for large projects with thousands of sessions to avoid blocking your terminal.
+</Accordion>
+
+## Performance
+
+- **Speed**: ~1000 sessions/second on typical hardware
+- **Background mode**: No terminal blocking, system notification on completion
+- **Incremental**: Only indexes new/changed sessions unless `--force` is used
+- **Memory**: Processes sessions in batches to avoid memory issues
+
+<Tip>
+Run `oobo index` after `oobo scan` to ensure your stats and analytics are up to date.
+</Tip>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Scan" icon="radar" href="/commands/scan">
+    Discover projects and sessions
+  </Card>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    View analytics after indexing
+  </Card>
+</CardGroup>

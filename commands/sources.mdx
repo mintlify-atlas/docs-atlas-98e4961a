@@ -1,0 +1,192 @@
+---
+title: "oobo sources"
+description: "Data source status and coverage for all tools"
+---
+
+## Overview
+
+The `oobo sources` command shows the status and coverage of all AI tool data sources. It displays which tools are enabled, where their data is stored, how many sessions have been found, and whether transcripts and token data are available.
+
+## Usage
+
+```bash
+oobo sources [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--agent" type="boolean">
+  Output as JSON for machine parsing
+</ParamField>
+
+## Examples
+
+### Show all data sources
+
+```bash
+oobo sources
+```
+
+Example output:
+
+```
+Data Sources
+
+Cursor
+  Status: ✓ Enabled
+  Location: ~/.cursor/sessions/
+  Sessions: 47
+  Transcripts: ✓ Available
+  Tokens: ✓ Available
+  Agent Hooks: ✓ Installed
+
+Claude Code
+  Status: ✓ Enabled
+  Location: ~/.claude/sessions/
+  Sessions: 23
+  Transcripts: ✓ Available
+  Tokens: ✓ Available
+  Agent Hooks: ✓ Installed
+
+GitHub Copilot
+  Status: ✓ Enabled
+  Location: ~/.vscode/extensions/.../
+  Sessions: 18
+  Transcripts: ✓ Available
+  Tokens: ⚠ Partial (requires API key)
+  Agent Hooks: ✗ Not supported
+
+Windsurf
+  Status: ✗ Disabled
+  Location: ~/.codeium/windsurf/
+  Sessions: 0
+  Transcripts: ✗ Encrypted
+  Tokens: ⚠ Partial
+  Agent Hooks: ✗ Not supported
+```
+
+### JSON output for agents
+
+```bash
+oobo sources --agent
+```
+
+Returns:
+
+```json
+{
+  "status": "ok",
+  "sources": [
+    {
+      "tool": "cursor",
+      "enabled": true,
+      "location": "/home/user/.cursor/sessions/",
+      "sessions_found": 47,
+      "transcripts_available": true,
+      "tokens_available": true,
+      "agent_hooks_installed": true,
+      "notes": null
+    },
+    {
+      "tool": "windsurf",
+      "enabled": false,
+      "location": "/home/user/.codeium/windsurf/",
+      "sessions_found": 0,
+      "transcripts_available": false,
+      "tokens_available": false,
+      "agent_hooks_installed": false,
+      "notes": "Transcripts are encrypted by default"
+    }
+  ]
+}
+```
+
+## Data Source Status
+
+### Status Indicators
+
+- **✓ Enabled** — Tool is enabled in config and oobo will track sessions
+- **✗ Disabled** — Tool is disabled in config (can be enabled via `oobo setup`)
+- **⚠ Not Detected** — Tool data directory not found (tool may not be installed)
+
+### Transcript Availability
+
+- **✓ Available** — Full conversation transcripts can be read
+- **⚠ Partial** — Some transcripts available, some encrypted or missing
+- **✗ Encrypted** — Transcripts are encrypted (e.g., Windsurf)
+
+### Token Availability
+
+- **✓ Available** — Accurate token counts from tool's session files
+- **⚠ Partial** — Estimated tokens (requires API key for exact counts)
+- **⚠ Requires API key** — Need API key configured via `oobo auth` for token data
+
+### Agent Hooks
+
+- **✓ Installed** — Lifecycle hooks installed for real-time session linking
+- **✗ Not supported** — Tool doesn't support agent hooks (uses time-window correlation)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Sessions found is 0">
+    Run `oobo scan` to discover sessions. The tool may be enabled but not yet scanned.
+  </Accordion>
+
+  <Accordion title="Tokens show as Partial">
+    Configure API keys via `oobo auth anthropic <key>` or `oobo auth openai <key>` to fetch accurate token counts from provider APIs.
+  </Accordion>
+
+  <Accordion title="Tool shows as Not Detected">
+    The tool may not be installed, or its data directory may be in a non-standard location. Check the installation and run `oobo setup` to configure manually.
+  </Accordion>
+
+  <Accordion title="Agent Hooks show as Not Installed">
+    Run `oobo setup` and confirm hook installation when prompted. Hooks require write access to the tool's configuration directory.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+### Verify tool detection
+
+After installing a new AI tool, run `oobo sources` to verify oobo can read its session data:
+
+```bash
+oobo sources
+```
+
+### Audit data coverage
+
+Check which tools have complete data (transcripts + tokens) vs partial coverage:
+
+```bash
+oobo sources | grep -E "Transcripts:|Tokens:"
+```
+
+### Diagnose missing sessions
+
+If stats seem incomplete, check `sources` to see which tools have 0 sessions and run `oobo scan`:
+
+```bash
+oobo sources
+oobo scan
+oobo index
+```
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Scan" icon="radar" href="/commands/scan">
+    Discover sessions across all tools
+  </Card>
+  <Card title="Setup" icon="gear" href="/commands/setup">
+    Configure and enable tools
+  </Card>
+  <Card title="Auth" icon="key" href="/commands/auth">
+    Add API keys for token data
+  </Card>
+  <Card title="Supported Tools" icon="list" href="/guides/supported-tools">
+    Complete tool compatibility matrix
+  </Card>
+</CardGroup>

@@ -1,0 +1,120 @@
+---
+title: "oobo card"
+description: "Generate a shareable developer stats card"
+---
+
+## Overview
+
+The `oobo card` command generates a shareable developer stats card that showcases your AI tool usage across all projects. The card includes sessions, tokens, models, AI code percentage, and commit profile — without any project names or private data.
+
+## Usage
+
+```bash
+oobo card [OPTIONS]
+```
+
+## Options
+
+<ParamField path="--out" type="string">
+  Save markdown to a custom file path (default: `oobo-card.md`)
+</ParamField>
+
+<ParamField path="--agent" type="boolean">
+  Output as JSON for machine parsing
+</ParamField>
+
+## Examples
+
+### Generate and save card
+
+```bash
+oobo card
+```
+
+This saves the card to `oobo-card.md` in the current directory.
+
+### Save to custom path
+
+```bash
+oobo card --out ~/dev-card.md
+```
+
+### JSON output for agents
+
+```bash
+oobo card --agent
+```
+
+Returns:
+
+```json
+{
+  "status": "ok",
+  "card_path": "/home/user/oobo-card.md",
+  "stats": {
+    "total_sessions": 142,
+    "total_tokens": 1847293,
+    "ai_code_percentage": 67.3,
+    "top_model": "claude-sonnet-4-20250514",
+    "tools_used": ["cursor", "claude", "opencode"],
+    "commits": {
+      "agent": 23,
+      "assisted": 89,
+      "human": 15
+    }
+  }
+}
+```
+
+## Card Contents
+
+The generated card includes:
+
+- **Total sessions** across all AI tools
+- **Token usage** (input, output, cache)
+- **Models used** and most-used model
+- **AI code percentage** (lines written by AI vs human)
+- **Commit profile** (agent, assisted, human breakdown)
+- **Tools used** (Cursor, Claude Code, etc.)
+- **Time period** covered
+
+<Note>
+The card contains **no project names or private data** — it's safe to share publicly on your GitHub profile, resume, or portfolio.
+</Note>
+
+## Use Cases
+
+### GitHub Profile README
+
+Add your developer card to your GitHub profile README to showcase your AI-first development workflow:
+
+```bash
+oobo card --out ~/github-profile/dev-card.md
+```
+
+### Portfolio or Resume
+
+Include your AI tool usage statistics when applying for roles that value AI-assisted development:
+
+```bash
+oobo card --out ~/portfolio/ai-stats.md
+```
+
+### Team Analytics
+
+Export cards for team members to understand AI adoption across the team:
+
+```bash
+oobo card --agent | jq '.stats'
+```
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="Stats" icon="chart-line" href="/commands/stats">
+    Detailed token analytics and attribution
+  </Card>
+  <Card title="Sources" icon="database" href="/commands/sources">
+    Data source status and coverage
+  </Card>
+</CardGroup>

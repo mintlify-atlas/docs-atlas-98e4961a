@@ -52,10 +52,17 @@
               "commands/anchors",
               "commands/stats",
               "commands/projects",
+              "commands/card",
               "commands/setup",
               "commands/scan",
+              "commands/index",
+              "commands/sources",
               "commands/share",
-              "commands/agent"
+              "commands/auth",
+              "commands/agent",
+              "commands/inspect",
+              "commands/update",
+              "commands/version"
             ]
           },
           {
